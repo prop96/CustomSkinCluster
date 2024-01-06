@@ -5,7 +5,7 @@
 #include <maya/MItGeometry.h>
 #include <maya/MMatrix.h>
 
-class LBSCluster : public MPxSkinCluster
+class CustomSkinCluster : public MPxSkinCluster
 {
 public:
 	MStatus deform(MDataBlock& block, MItGeometry& iter, const MMatrix& mat, unsigned int multiIdx) override;

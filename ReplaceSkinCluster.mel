@@ -171,7 +171,7 @@ global proc ConvertToCustomSkinCluster()
     string $joint_names[] = `listConnections ($cluster+".matrix")`;
  
     // Create custom skin cluster:
-    string $deformers[] = `deformer -type "LBSCluster"`;
+    string $deformers[] = `deformer -type "CustomSkinCluster"`;
     string $customSkinCluster = $deformers[0];
  
     // Link joints and copy bind pose matrices from the source skin cluster:

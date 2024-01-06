@@ -4,7 +4,7 @@
 #include <maya/MPxCommand.h>
 #include <maya/MDGModifier.h>
 
-
+// TODO: CustonSkinCluster を SkinCluster に戻すコマンドも用意するべき
 class ReplaceSkinClusterCmd : public MPxCommand
 {
 public:

@@ -4,9 +4,9 @@
 #include <maya/MPoint.h>
 
 
-const MTypeId LBSCluster::id(0x00080031);
+const MTypeId CustomSkinCluster::id(0x00080031);
 
-MStatus LBSCluster::deform(MDataBlock& block, MItGeometry& iter, const MMatrix& localToWorld, unsigned int multiIdx)
+MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MMatrix& localToWorld, unsigned int multiIdx)
 {
 	MStatus stat;
 
@@ -53,6 +53,7 @@ MStatus LBSCluster::deform(MDataBlock& block, MItGeometry& iter, const MMatrix& 
 
 			// logical index represent the actual joint index
 			int jointIdx = weightsHandle.elementIndex();
+			// NOTE: jointIdx Ç™èdï°ÇµÇƒÇµÇ‹Ç§ÇÃÇ≈ÅAèdï°ÇîÇØÇÈ
 			if (jointIdx == preJointIdx)
 			{
 				numWeights++;
@@ -81,12 +82,12 @@ MStatus LBSCluster::deform(MDataBlock& block, MItGeometry& iter, const MMatrix& 
 	return stat;
 }
 
-void* LBSCluster::creator()
+void* CustomSkinCluster::creator()
 {
-	return new LBSCluster();
+	return new CustomSkinCluster();
 }
 
-MStatus LBSCluster::initialize()
+MStatus CustomSkinCluster::initialize()
 {
 	return MStatus::kSuccess;
 }

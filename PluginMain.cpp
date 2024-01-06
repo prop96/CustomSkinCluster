@@ -20,7 +20,7 @@ MStatus initializePlugin(MObject obj)
 		return stat;
 	}
 
-	stat = plugin.registerNode("LBSCluster", LBSCluster::id, LBSCluster::creator, LBSCluster::initialize, MPxNode::kSkinCluster);
+	stat = plugin.registerNode("CustomSkinCluster", CustomSkinCluster::id, CustomSkinCluster::creator, CustomSkinCluster::initialize, MPxNode::kSkinCluster);
 	if (!stat)
 	{
 		stat.perror("registerSkinClusterNode failed");
@@ -47,7 +47,7 @@ MStatus uninitializePlugin(MObject obj)
 		return stat;
 	}
 
-	stat = plugin.deregisterNode(LBSCluster::id);
+	stat = plugin.deregisterNode(CustomSkinCluster::id);
 	if (!stat)
 	{
 		stat.perror("deregisterNode failed");
