@@ -18,7 +18,7 @@ cmake_minimum_required(VERSION 3.13)
 include($ENV{DEVKIT_LOCATION}/cmake/pluginEntry.cmake)
 
 # specify project name
-set(PROJECT_NAME CustonSkinCluster)
+set(PROJECT_NAME CustomSkinCluster)
 
 # set SOURCE_FILES
 set(SOURCE_FILES
