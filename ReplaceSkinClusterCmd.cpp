@@ -51,102 +51,34 @@ MStatus ReplaceSkinClusterCmd::doIt(const MArgList&)
 		CHECK_MSTATUS(iter.getDagPath(dagPath));
 		CHECK_MSTATUS(dagPath.extendToShape());
 
-		// get the SkinCluster node
-		MObject skinClusterObj = FindSkinClusterNode(dagPath, &stat);
+		// get the current SkinCluster node
+		MObject srcSkclObj = FindSkinClusterNode(dagPath, &stat);
 		CHECK_MSTATUS(stat);
-		if (skinClusterObj.isNull())
+		if (srcSkclObj.isNull())
 		{
 			continue;
 		}
-		MFnSkinCluster skinClusterFn(skinClusterObj);
+		MFnSkinCluster srcSkclFn(srcSkclObj);
 
 		// create the new SkinCluster node
-		MObject customSkinClusterObj = dgMod.createNode("CustomSkinCluster", &stat);
+		MObject dstSkclObj = dgMod.createNode(newSkinCluster, &stat);
 		CHECK_MSTATUS(stat);
-		MFnSkinCluster customSkinClusterFn(customSkinClusterObj);
+		MFnSkinCluster dstSkclFn(dstSkclObj);
 
 		// connect input and output
-		CHECK_MSTATUS(ConnectJointNodes(skinClusterFn, customSkinClusterFn));
-		{
-			MPlug bindPose = skinClusterFn.findPlug("bindPose", true, &stat);
-			CHECK_MSTATUS(stat);
-			MPlugArray plugs;
-			bindPose.connectedTo(plugs, true, false, &stat);
-			CHECK_MSTATUS(stat);
+		CHECK_MSTATUS(ConnectJointNodes(srcSkclFn, dstSkclFn));
+		CHECK_MSTATUS(ReplaceConnection("bindPose", srcSkclFn, dstSkclFn, true));
+		CHECK_MSTATUS(ReplaceConnection("input[0].inputGeometry", srcSkclFn, dstSkclFn, true));
+		CHECK_MSTATUS(ReplaceConnection("originalGeometry[0]", srcSkclFn, dstSkclFn, true));
+		CHECK_MSTATUS(ReplaceConnection("outputGeometry[0]", srcSkclFn, dstSkclFn, false));
 
-			MPlug message = plugs[0];
-			MPlug bindPoseNew = customSkinClusterFn.findPlug("bindPose", true, &stat);
-			CHECK_MSTATUS(dgMod.connect(message, bindPoseNew));
-		}
-		{
-			MPlug inputPlug = skinClusterFn.findPlug("input", true, &stat).elementByLogicalIndex(0, &stat);
-			CHECK_MSTATUS(stat);
-			MPlug inputGeomPlug = inputPlug.child(MPxSkinCluster::inputGeom, &stat);
-			CHECK_MSTATUS(stat);
-			MPlugArray plugs;
-			inputGeomPlug.connectedTo(plugs, true, false, &stat);
-			CHECK_MSTATUS(stat);
-
-			MPlug worldMesh = plugs[0];
-			MPlug inputGeomPlugNew = customSkinClusterFn.findPlug("input", true, &stat).elementByLogicalIndex(0, &stat).child(MPxSkinCluster::inputGeom, &stat);
-			CHECK_MSTATUS(dgMod.connect(worldMesh, inputGeomPlugNew));
-		}
-		{
-			MPlug origGeomPlug = skinClusterFn.findPlug("originalGeometry", true, &stat).elementByLogicalIndex(0, &stat);
-			CHECK_MSTATUS(stat);
-			MPlugArray plugs;
-			origGeomPlug.connectedTo(plugs, true, false, &stat);
-			CHECK_MSTATUS(stat);
-
-			MPlug outMesh = plugs[0];
-			MPlug origGeomPlugNew = customSkinClusterFn.findPlug("originalGeometry", true, &stat).elementByLogicalIndex(0, &stat);
-			CHECK_MSTATUS(dgMod.connect(outMesh, origGeomPlugNew));
-		}
-		{
-			MPlug outputGeom = skinClusterFn.findPlug("outputGeometry", true, &stat).elementByLogicalIndex(0, &stat);
-			CHECK_MSTATUS(stat);
-			MPlugArray plugs;
-			outputGeom.connectedTo(plugs, false, true, &stat);
-			CHECK_MSTATUS(stat);
-
-			MPlug outputGeomNew = customSkinClusterFn.findPlug("outputGeometry", true, &stat).elementByLogicalIndex(0, &stat);
-			MPlug inMesh = plugs[0];
-			CHECK_MSTATUS(dgMod.disconnect(outputGeom, inMesh));
-			CHECK_MSTATUS(dgMod.connect(outputGeomNew, inMesh));
-		}
-
-		// copy attribute data
-		{
-			// weightList
-			MPlug weightListSrc = skinClusterFn.findPlug("weightList", true, &stat);
-			CHECK_MSTATUS(stat);
-			MPlug weightListDst = customSkinClusterFn.findPlug("weightList", true, &stat);
-			CHECK_MSTATUS(stat);
-			CHECK_MSTATUS(dgMod.connect(weightListSrc, weightListDst));
-		}
-		{
-			// bindPreMatrix
-			MPlug bindPreMatrixSrc = skinClusterFn.findPlug("bindPreMatrix", true, &stat);
-			unsigned int numMats = bindPreMatrixSrc.numElements(&stat);
-			MPlug bindPreMatrixDst = customSkinClusterFn.findPlug("bindPreMatrix", true, &stat);
-			CHECK_MSTATUS(bindPreMatrixDst.setNumElements(numMats));
-			for (unsigned int mIdx = 0; mIdx < numMats; mIdx++)
-			{
-				MPlug bpmSrc = bindPreMatrixSrc.elementByLogicalIndex(mIdx, &stat);
-				MObject mtxObj;
-				bpmSrc.getValue(mtxObj);
-				MFnMatrixData matFn(mtxObj);
-				MMatrix mtx = matFn.matrix();
-
-				MPlug bpmDst = bindPreMatrixDst.elementByLogicalIndex(mIdx, &stat);
-				bpmDst.setMObject(mtxObj);
-			}
-		}
+		// copy attribute data by connecting them
+		CHECK_MSTATUS(ConnectSameAttribute("weightList", srcSkclFn, dstSkclFn));
+		CHECK_MSTATUS(ConnectSameAttribute("bindPreMatrix", srcSkclFn, dstSkclFn));
 
 		// finally, delete the old SkinCluster node
 		dgMod.doIt();
-		MGlobal::deleteNode(skinClusterObj);
-		//CHECK_MSTATUS(dgMod.deleteNode(skinClusterObj));
+		MGlobal::deleteNode(srcSkclObj);
 	}
 
 	return dgMod.doIt();
@@ -158,11 +90,12 @@ MObject ReplaceSkinClusterCmd::FindSkinClusterNode(const MDagPath& meshPath, MSt
 
 	// mesh node must have inMesh attribute
 	MPlug inMeshPlug = dagNode.findPlug("inMesh", ptrStat);
-	if (*ptrStat != MS::kSuccess || !inMeshPlug.isConnected())
+	CHECK_MSTATUS(*ptrStat);
+	if (!inMeshPlug.isConnected(ptrStat))
 	{
-		*ptrStat = MS::kNotFound;
 		return MObject::kNullObj;
 	}
+	CHECK_MSTATUS(*ptrStat);
 
 	// search skin cluster node, upwards from the mesh node
 	MItDependencyGraph dgIt(
@@ -172,24 +105,18 @@ MObject ReplaceSkinClusterCmd::FindSkinClusterNode(const MDagPath& meshPath, MSt
 		MItDependencyGraph::kDepthFirst,
 		MItDependencyGraph::kPlugLevel,
 		ptrStat);
-
-	if (*ptrStat != MS::kSuccess)
-	{
-		return MObject::kNullObj;
-	}
+	CHECK_MSTATUS(*ptrStat);
 
 	for (dgIt.disablePruningOnFilter(); !dgIt.isDone(); dgIt.next())
 	{
+		// return if SkinCluster or CustomSkinCluster node
 		MObject thisNode = dgIt.thisNode();
-		if (thisNode.apiType() != MFn::kSkinClusterFilter)
+		if (thisNode.apiType() == MFn::kSkinClusterFilter || thisNode.apiType() == MFn::kPluginSkinCluster)
 		{
-			continue;
+			return thisNode;
 		}
-
-		return thisNode;
 	}
 
-	*ptrStat = MS::kNotFound;
 	return MObject::kNullObj;
 }
 
@@ -253,6 +180,93 @@ MStatus ReplaceSkinClusterCmd::ConnectJointNodes(const MFnSkinCluster& src, cons
 			CHECK_MSTATUS(dgMod.connect(objColor, influenceColorDst.elementByLogicalIndex(matIdx, &returnStatus)));
 		}
 	}
+
+	return returnStatus;
+}
+
+MStatus ReplaceSkinClusterCmd::ReplaceConnection(const MString& attrName, const MFnSkinCluster& src, const MFnSkinCluster& dst, bool asDst)
+{
+	MStatus returnStatus;
+
+	// split the attribute name by '.'
+	MStringArray attrPath;
+	CHECK_MSTATUS(attrName.split('.', attrPath));
+
+	// parse the attribute path and obtain the instance of the plug
+	MPlug srcPlug, dstPlug;
+	for (auto it = attrPath.begin(); it != attrPath.end(); ++it)
+	{
+		// query if the string includes any parenthesis
+		MStringArray strArray;
+		CHECK_MSTATUS((*it).split('[', strArray));
+
+		// don't assume the dual parenthesis such as "hoge[0][0]"
+		assert(strArray.length() == 1 || strArray.length() == 2);
+
+		// anyway, the first string represents the attribute name
+		MObject obj = src.attribute(strArray[0], &returnStatus);
+		CHECK_MSTATUS(returnStatus);
+
+		// get the plug instance from MObject
+		if (it == attrPath.begin())
+		{
+			srcPlug = src.findPlug(obj, &returnStatus);
+			CHECK_MSTATUS(returnStatus);
+			dstPlug = dst.findPlug(obj, &returnStatus);
+			CHECK_MSTATUS(returnStatus);
+		}
+		else
+		{
+			srcPlug = srcPlug.child(obj, &returnStatus);
+			CHECK_MSTATUS(returnStatus);
+			dstPlug = dstPlug.child(obj, &returnStatus);
+			CHECK_MSTATUS(returnStatus);
+		}
+
+		// if the string includes a parenthesis, get the corresponding element
+		if (strArray.length() == 2)
+		{
+			CHECK_MSTATUS(strArray[1].split(']', strArray));
+			unsigned int val = strArray[0].asUnsigned();
+			srcPlug = srcPlug.elementByLogicalIndex(val, &returnStatus);
+			CHECK_MSTATUS(returnStatus);
+			dstPlug = dstPlug.elementByLogicalIndex(val, &returnStatus);
+			CHECK_MSTATUS(returnStatus);
+		}
+	}
+
+	// search plugs connecting to the given attribute in the src SkinCluster
+	MPlugArray connectedPlugs;
+	srcPlug.connectedTo(connectedPlugs, asDst, !asDst, &returnStatus);
+	CHECK_MSTATUS(returnStatus);
+
+	// connect the given attribute in the dst SkinCluster with the found plug
+	for (const auto& plug : connectedPlugs)
+	{
+		if (asDst)
+		{
+			CHECK_MSTATUS(dgMod.disconnect(plug, srcPlug));
+			CHECK_MSTATUS(dgMod.connect(plug, dstPlug));
+		}
+		else
+		{
+			CHECK_MSTATUS(dgMod.disconnect(srcPlug, plug));
+			CHECK_MSTATUS(dgMod.connect(dstPlug, plug));
+		}
+	}
+
+	return returnStatus;
+}
+
+MStatus ReplaceSkinClusterCmd::ConnectSameAttribute(const MString& attrName, const MFnSkinCluster& src, const MFnSkinCluster& dst)
+{
+	MStatus returnStatus;
+
+	MPlug srcPlug = src.findPlug(attrName, &returnStatus);
+	CHECK_MSTATUS(returnStatus);
+	MPlug dstPlug = dst.findPlug(attrName, &returnStatus);
+	CHECK_MSTATUS(returnStatus);
+	CHECK_MSTATUS(dgMod.connect(srcPlug, dstPlug));
 
 	return returnStatus;
 }
