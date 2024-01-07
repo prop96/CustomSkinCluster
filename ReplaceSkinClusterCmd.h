@@ -3,8 +3,8 @@
 #include <maya/MIOStream.h>
 #include <maya/MPxCommand.h>
 #include <maya/MDGModifier.h>
+#include <maya/MArgList.h>
 
-// TODO: CustonSkinCluster を SkinCluster に戻すコマンドも用意するべき
 class ReplaceSkinClusterCmd : public MPxCommand
 {
 public:
@@ -19,6 +19,8 @@ public:
 private:
 	MDGModifier dgMod;
 
+	MStatus ReplaceSkinCluster(const MString& newSkclType);
+
 	/// <summary>
 	/// return SkinCluster or CustomSkinCluster node connecting to the given mesh
 	/// </summary>
@@ -27,7 +29,7 @@ private:
 	/// <returns></returns>
 	MObject FindSkinClusterNode(const MDagPath& meshPath, MStatus* ptrStat);
 
-	MStatus ConnectJointNodes(const MFnSkinCluster& src, const MFnSkinCluster& dst);
+	MStatus ReplaceConnectionToJoints(const MFnSkinCluster& src, const MFnSkinCluster& dst);
 
 	/// <summary>
 	/// Disconnect the given plug in the src SkinCluster, and reconnect to that in the dst SkinCluster
@@ -49,5 +51,5 @@ private:
 	MStatus ConnectSameAttribute(const MString& attrName, const MFnSkinCluster& src, const MFnSkinCluster& dst);
 
 protected:
-	const MString newSkinCluster = "CustomSkinCluster";
+	const MString m_newSkinCluster = "CustomSkinCluster";
 };

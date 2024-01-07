@@ -2,19 +2,16 @@
 #include <maya/MSelectionList.h>
 #include <maya/MGlobal.h>
 #include <maya/MDagPath.h>
+#include <maya/MFnDagNode.h>
 #include <maya/MFnSkinCluster.h>
-#include <maya/MFnTransform.h>
+#include <maya/MPxSkinCluster.h>
 #include <maya/MItSelectionList.h>
 #include <maya/MPlug.h>
-#include <maya/MPxSkinCluster.h>
-#include <cassert>
-
-#include <maya/MFnMesh.h>
 #include <maya/MItDependencyGraph.h>
-#include <maya/MFnArrayAttrsData.h>
-#include <maya/MFnAttribute.h>
 #include <maya/MMatrix.h>
 #include <maya/MFnMatrixData.h>
+#include <cassert>
+
 
 ReplaceSkinClusterCmd::ReplaceSkinClusterCmd()
 {
@@ -30,6 +27,22 @@ void* ReplaceSkinClusterCmd::creator()
 }
 
 MStatus ReplaceSkinClusterCmd::doIt(const MArgList&)
+{
+	return ReplaceSkinCluster(m_newSkinCluster);
+}
+
+MStatus ReplaceSkinClusterCmd::undoIt()
+{
+	return ReplaceSkinCluster("skinCluster");
+}
+
+MStatus ReplaceSkinClusterCmd::redoIt()
+{
+	MArgList argList;
+	return doIt(argList);
+}
+
+MStatus ReplaceSkinClusterCmd::ReplaceSkinCluster(const MString& newSkclType)
 {
 	MStatus stat;
 
@@ -61,12 +74,12 @@ MStatus ReplaceSkinClusterCmd::doIt(const MArgList&)
 		MFnSkinCluster srcSkclFn(srcSkclObj);
 
 		// create the new SkinCluster node
-		MObject dstSkclObj = dgMod.createNode(newSkinCluster, &stat);
+		MObject dstSkclObj = dgMod.createNode(newSkclType, &stat);
 		CHECK_MSTATUS(stat);
 		MFnSkinCluster dstSkclFn(dstSkclObj);
 
 		// connect input and output
-		CHECK_MSTATUS(ConnectJointNodes(srcSkclFn, dstSkclFn));
+		CHECK_MSTATUS(ReplaceConnectionToJoints(srcSkclFn, dstSkclFn));
 		CHECK_MSTATUS(ReplaceConnection("bindPose", srcSkclFn, dstSkclFn, true));
 		CHECK_MSTATUS(ReplaceConnection("input[0].inputGeometry", srcSkclFn, dstSkclFn, true));
 		CHECK_MSTATUS(ReplaceConnection("originalGeometry[0]", srcSkclFn, dstSkclFn, true));
@@ -77,8 +90,8 @@ MStatus ReplaceSkinClusterCmd::doIt(const MArgList&)
 		CHECK_MSTATUS(ConnectSameAttribute("bindPreMatrix", srcSkclFn, dstSkclFn));
 
 		// finally, delete the old SkinCluster node
-		dgMod.doIt();
-		MGlobal::deleteNode(srcSkclObj);
+		CHECK_MSTATUS(dgMod.doIt());
+		CHECK_MSTATUS(MGlobal::deleteNode(srcSkclObj));
 	}
 
 	return dgMod.doIt();
@@ -120,7 +133,7 @@ MObject ReplaceSkinClusterCmd::FindSkinClusterNode(const MDagPath& meshPath, MSt
 	return MObject::kNullObj;
 }
 
-MStatus ReplaceSkinClusterCmd::ConnectJointNodes(const MFnSkinCluster& src, const MFnSkinCluster& dst)
+MStatus ReplaceSkinClusterCmd::ReplaceConnectionToJoints(const MFnSkinCluster& src, const MFnSkinCluster& dst)
 {
 	MStatus returnStatus;
 
@@ -269,14 +282,4 @@ MStatus ReplaceSkinClusterCmd::ConnectSameAttribute(const MString& attrName, con
 	CHECK_MSTATUS(dgMod.connect(srcPlug, dstPlug));
 
 	return returnStatus;
-}
-
-MStatus ReplaceSkinClusterCmd::undoIt()
-{
-	return dgMod.doIt();
-}
-
-MStatus ReplaceSkinClusterCmd::redoIt()
-{
-	return dgMod.undoIt();
 }
