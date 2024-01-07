@@ -6,10 +6,15 @@
 #include <maya/MFnTransform.h>
 #include <maya/MItSelectionList.h>
 #include <maya/MPlug.h>
+#include <maya/MPxSkinCluster.h>
+#include <cassert>
 
 #include <maya/MFnMesh.h>
 #include <maya/MItDependencyGraph.h>
 #include <maya/MFnArrayAttrsData.h>
+#include <maya/MFnAttribute.h>
+#include <maya/MMatrix.h>
+#include <maya/MFnMatrixData.h>
 
 ReplaceSkinClusterCmd::ReplaceSkinClusterCmd()
 {
@@ -37,87 +42,114 @@ MStatus ReplaceSkinClusterCmd::doIt(const MArgList&)
 		return stat;
 	}
 
-	// find all the Transform nodes of the selected objects
-	MDagPath dagPath;
-	MFnTransform transformFn;
-	MFnSkinCluster skinClusterFn;
-	MString name;
-	//MItSelectionList iter(selection, MFn::kTransform);
+	// find SkinCluster nodes of the selected objects
 	MItSelectionList iter(selection);
 	for (iter.reset(); !iter.isDone(); iter.next())
 	{
-		iter.getDagPath(dagPath);
-		//CHECK_MSTATUS(iter.getDagPath(dagPath));
-		dagPath.extendToShape();
-		auto apitype = dagPath.apiType();
-		auto classname = dagPath.className();
-		auto cc = dagPath.childCount();
-		std::cout << apitype << classname << cc << endl;
+		// get DAG path of the mesh node
+		MDagPath dagPath;
+		CHECK_MSTATUS(iter.getDagPath(dagPath));
+		CHECK_MSTATUS(dagPath.extendToShape());
 
+		// get the SkinCluster node
 		MObject skinClusterObj = FindSkinClusterNode(dagPath, &stat);
-		if (skinClusterObj.isNull() || stat != MS::kSuccess)
+		CHECK_MSTATUS(stat);
+		if (skinClusterObj.isNull())
 		{
 			continue;
 		}
+		MFnSkinCluster skinClusterFn(skinClusterObj);
 
-		MFnSkinCluster skinCluster(skinClusterObj);
+		// create the new SkinCluster node
+		MObject customSkinClusterObj = dgMod.createNode("CustomSkinCluster", &stat);
+		CHECK_MSTATUS(stat);
+		MFnSkinCluster customSkinClusterFn(customSkinClusterObj);
 
-		MPlug inputPlug = skinCluster.findPlug("weightList", true, &stat);
-		if (stat == MS::kSuccess)
+		// connect input and output
+		CHECK_MSTATUS(ConnectJointNodes(skinClusterFn, customSkinClusterFn));
 		{
-			MObject obj;
-			inputPlug.getValue(obj);
+			MPlug bindPose = skinClusterFn.findPlug("bindPose", true, &stat);
+			CHECK_MSTATUS(stat);
+			MPlugArray plugs;
+			bindPose.connectedTo(plugs, true, false, &stat);
+			CHECK_MSTATUS(stat);
 
-			MFnArrayAttrsData arrayData(obj);
+			MPlug message = plugs[0];
+			MPlug bindPoseNew = customSkinClusterFn.findPlug("bindPose", true, &stat);
+			CHECK_MSTATUS(dgMod.connect(message, bindPoseNew));
+		}
+		{
+			MPlug inputPlug = skinClusterFn.findPlug("input", true, &stat).elementByLogicalIndex(0, &stat);
+			CHECK_MSTATUS(stat);
+			MPlug inputGeomPlug = inputPlug.child(MPxSkinCluster::inputGeom, &stat);
+			CHECK_MSTATUS(stat);
+			MPlugArray plugs;
+			inputGeomPlug.connectedTo(plugs, true, false, &stat);
+			CHECK_MSTATUS(stat);
 
-			MFnArrayAttrsData::Type doubleType(MFnArrayAttrsData::kDoubleArray);
-			bool flag = arrayData.checkArrayExist("weights", doubleType);
-			std::cout << flag << std::endl;
+			MPlug worldMesh = plugs[0];
+			MPlug inputGeomPlugNew = customSkinClusterFn.findPlug("input", true, &stat).elementByLogicalIndex(0, &stat).child(MPxSkinCluster::inputGeom, &stat);
+			CHECK_MSTATUS(dgMod.connect(worldMesh, inputGeomPlugNew));
+		}
+		{
+			MPlug origGeomPlug = skinClusterFn.findPlug("originalGeometry", true, &stat).elementByLogicalIndex(0, &stat);
+			CHECK_MSTATUS(stat);
+			MPlugArray plugs;
+			origGeomPlug.connectedTo(plugs, true, false, &stat);
+			CHECK_MSTATUS(stat);
 
-			//MPlug childPlug = inputPlug.elementByLogicalIndex(0);
-			//MPlug geomPlug = childPlug.child(0);
+			MPlug outMesh = plugs[0];
+			MPlug origGeomPlugNew = customSkinClusterFn.findPlug("originalGeometry", true, &stat).elementByLogicalIndex(0, &stat);
+			CHECK_MSTATUS(dgMod.connect(outMesh, origGeomPlugNew));
+		}
+		{
+			MPlug outputGeom = skinClusterFn.findPlug("outputGeometry", true, &stat).elementByLogicalIndex(0, &stat);
+			CHECK_MSTATUS(stat);
+			MPlugArray plugs;
+			outputGeom.connectedTo(plugs, false, true, &stat);
+			CHECK_MSTATUS(stat);
 
-			//MPlug tmp = childPlug.elementByLogicalIndex(0);
-			//double val;
-			//tmp.getValue(val);
-			//std::cout << val << std::endl;
+			MPlug outputGeomNew = customSkinClusterFn.findPlug("outputGeometry", true, &stat).elementByLogicalIndex(0, &stat);
+			MPlug inMesh = plugs[0];
+			CHECK_MSTATUS(dgMod.disconnect(outputGeom, inMesh));
+			CHECK_MSTATUS(dgMod.connect(outputGeomNew, inMesh));
 		}
 
+		// copy attribute data
+		{
+			// weightList
+			MPlug weightListSrc = skinClusterFn.findPlug("weightList", true, &stat);
+			CHECK_MSTATUS(stat);
+			MPlug weightListDst = customSkinClusterFn.findPlug("weightList", true, &stat);
+			CHECK_MSTATUS(stat);
+			CHECK_MSTATUS(dgMod.connect(weightListSrc, weightListDst));
+		}
+		{
+			// bindPreMatrix
+			MPlug bindPreMatrixSrc = skinClusterFn.findPlug("bindPreMatrix", true, &stat);
+			unsigned int numMats = bindPreMatrixSrc.numElements(&stat);
+			MPlug bindPreMatrixDst = customSkinClusterFn.findPlug("bindPreMatrix", true, &stat);
+			CHECK_MSTATUS(bindPreMatrixDst.setNumElements(numMats));
+			for (unsigned int mIdx = 0; mIdx < numMats; mIdx++)
+			{
+				MPlug bpmSrc = bindPreMatrixSrc.elementByLogicalIndex(mIdx, &stat);
+				MObject mtxObj;
+				bpmSrc.getValue(mtxObj);
+				MFnMatrixData matFn(mtxObj);
+				MMatrix mtx = matFn.matrix();
 
-		//CHECK_MSTATUS(transformFn.setObject(dagPath));
-		//skinClusterFn.setObject(dagPath);
-		//CHECK_MSTATUS(skinClusterFn.setObject(dagPath));
+				MPlug bpmDst = bindPreMatrixDst.elementByLogicalIndex(mIdx, &stat);
+				bpmDst.setMObject(mtxObj);
+			}
+		}
 
-
-		// generate RollingNode and connect to each Transform nodes
-		//MObject rollNodeObj = dgMod.createNode("RollingNode", &stat);
-		//CHECK_MSTATUS(stat);
-		//MFnDependencyNode depNodeFn(rollNodeObj);
-
-		//{
-		//	MPlug translateX = transformFn.findPlug("translateX", true, &stat);
-		//	CHECK_MSTATUS(stat);
-		//	MPlug distance = depNodeFn.findPlug("distance", true, &stat);
-		//	CHECK_MSTATUS(stat);
-		//	CHECK_MSTATUS(dgMod.connect(translateX, distance));
-		//}
-		//{
-		//	MPlug translateY = transformFn.findPlug("translateY", true, &stat);
-		//	CHECK_MSTATUS(stat);
-		//	MPlug radius = depNodeFn.findPlug("radius", true, &stat);
-		//	CHECK_MSTATUS(stat);
-		//	CHECK_MSTATUS(dgMod.connect(translateY, radius));
-		//}
-		//{
-		//	MPlug rotation = depNodeFn.findPlug("rotation", true, &stat);
-		//	CHECK_MSTATUS(stat);
-		//	MPlug rotateZ = transformFn.findPlug("rotateZ", true, &stat);
-		//	CHECK_MSTATUS(stat);
-		//	CHECK_MSTATUS(dgMod.connect(rotation, rotateZ));
-		//}
+		// finally, delete the old SkinCluster node
+		dgMod.doIt();
+		MGlobal::deleteNode(skinClusterObj);
+		//CHECK_MSTATUS(dgMod.deleteNode(skinClusterObj));
 	}
 
-	return redoIt();
+	return dgMod.doIt();
 }
 
 MObject ReplaceSkinClusterCmd::FindSkinClusterNode(const MDagPath& meshPath, MStatus* ptrStat)
@@ -159,6 +191,70 @@ MObject ReplaceSkinClusterCmd::FindSkinClusterNode(const MDagPath& meshPath, MSt
 
 	*ptrStat = MS::kNotFound;
 	return MObject::kNullObj;
+}
+
+MStatus ReplaceSkinClusterCmd::ConnectJointNodes(const MFnSkinCluster& src, const MFnSkinCluster& dst)
+{
+	MStatus returnStatus;
+
+	// get all the joints from the matrix attribute
+	MPlug matrixSrc = src.findPlug("matrix", true, &returnStatus);
+	CHECK_MSTATUS(returnStatus);
+
+	// allocate the array buffers for the new SkinCluster
+	unsigned int numJoints = matrixSrc.numElements();
+	MPlug matrixDst = dst.findPlug("matrix", true, &returnStatus);
+	CHECK_MSTATUS(returnStatus);
+	CHECK_MSTATUS(matrixDst.setNumElements(numJoints));
+	MPlug lockWeightsDst = dst.findPlug("lockWeights", true, &returnStatus);
+	CHECK_MSTATUS(returnStatus);
+	CHECK_MSTATUS(lockWeightsDst.setNumElements(numJoints));
+	MPlug influenceColorDst = dst.findPlug("influenceColor", true, &returnStatus);
+	CHECK_MSTATUS(returnStatus);
+	CHECK_MSTATUS(influenceColorDst.setNumElements(numJoints));
+
+	for (unsigned int matIdx = 0; matIdx < numJoints; matIdx++)
+	{
+		MPlug matrixElemPlug = matrixSrc.elementByLogicalIndex(matIdx, &returnStatus);
+		CHECK_MSTATUS(returnStatus);
+
+		// if matrix[idx] plug is connected as destination, the source plug should be a joint
+		if (!matrixElemPlug.isDestination(&returnStatus))
+		{
+			continue;
+		}
+		CHECK_MSTATUS(returnStatus);
+
+		// get the joint node
+		MPlugArray jointPlugs;
+		matrixElemPlug.connectedTo(jointPlugs, true, false, &returnStatus);
+		CHECK_MSTATUS(returnStatus);
+		assert(jointPlugs.length() == 1);
+		MObject jointNode = jointPlugs[0].node(&returnStatus);
+		CHECK_MSTATUS(returnStatus);
+		MFnDependencyNode jointFn(jointNode);
+
+		// connect
+		// - joint.worldMatrix[0] -> newSkinCluster.matrix[matIdx]
+		// - joint.liw -> newSkinCluster.lockWeights[matIdx]
+		// - joint.objectColorRGB -> newSkinCluster.influenceColor[matIdx]
+		{
+			MPlug worldMatrix = jointPlugs[0];
+			CHECK_MSTATUS(dgMod.connect(worldMatrix, matrixDst.elementByLogicalIndex(matIdx, &returnStatus)));
+		}
+		{
+			MPlug liw = jointFn.findPlug("liw", true, &returnStatus);
+			CHECK_MSTATUS(returnStatus);
+			CHECK_MSTATUS(dgMod.connect(liw, lockWeightsDst.elementByLogicalIndex(matIdx, &returnStatus)));
+		}
+		{
+			MPlug objColor = jointFn.findPlug("objectColorRGB", true, &returnStatus);
+			CHECK_MSTATUS(returnStatus);
+			CHECK_MSTATUS(dgMod.connect(objColor, influenceColorDst.elementByLogicalIndex(matIdx, &returnStatus)));
+		}
+	}
+
+	return returnStatus;
 }
 
 MStatus ReplaceSkinClusterCmd::undoIt()

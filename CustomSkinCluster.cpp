@@ -1,10 +1,26 @@
 #include "CustomSkinCluster.h"
+#include <maya/MItMeshVertex.h>
 #include <maya/MMatrixArray.h>
 #include <maya/MFnMatrixData.h>
 #include <maya/MPoint.h>
 
 
 const MTypeId CustomSkinCluster::id(0x00080031);
+
+MStatus CustomSkinCluster::compute(const MPlug& plug, MDataBlock& data)
+{
+	if (plug == weightList || plug == weights)
+	{
+		MItMeshVertex itVertex(input);
+		for (; !itVertex.isDone(); itVertex.next())
+		{
+			MPoint vertexPosition = itVertex.position();
+			cout << vertexPosition << endl;
+		}
+	}
+
+	return MPxSkinCluster::compute(plug, data);
+}
 
 MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MMatrix& localToWorld, unsigned int multiIdx)
 {
@@ -44,24 +60,15 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 		MArrayDataHandle weightsHandle = weightListsHandle.inputValue().child(weights);
 		
 		// compute influences from each joint
-		int numWeights = weightsHandle.elementCount();
-		int preJointIdx = -1;
-		for (int idx = 0; idx < numWeights; idx++)
+		unsigned int numWeights = weightsHandle.elementCount(); // # of nonzero weights
+		for (unsigned int wIdx = 0; wIdx < numWeights; wIdx++)
 		{
-			weightsHandle.jumpToElement(idx);
+			weightsHandle.jumpToArrayElement(wIdx); // jump to physical index
 			double w = weightsHandle.inputValue().asDouble();
 
-			// logical index represent the actual joint index
-			int jointIdx = weightsHandle.elementIndex();
-			// NOTE: jointIdx ‚ªd•¡‚µ‚Ä‚µ‚Ü‚¤‚Ì‚ÅAd•¡‚ð”ð‚¯‚é
-			if (jointIdx == preJointIdx)
-			{
-				numWeights++;
-				preJointIdx = jointIdx;
-				continue;
-			}
-			preJointIdx = jointIdx;
-			
+			// logical index = joint index
+			unsigned int jointIdx = weightsHandle.elementIndex(&stat);
+
 			transformsHandle.jumpToElement(jointIdx); // jump to logical index
 			MMatrix jointMat = MFnMatrixData(transformsHandle.inputValue().data()).matrix();
 

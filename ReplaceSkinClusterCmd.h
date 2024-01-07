@@ -20,4 +20,6 @@ private:
 	MDGModifier dgMod;
 
 	MObject FindSkinClusterNode(const MDagPath& meshPath, MStatus* ptrStat);
+
+	MStatus ConnectJointNodes(const MFnSkinCluster& src, const MFnSkinCluster& dst);
 };

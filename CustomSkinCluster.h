@@ -8,6 +8,7 @@
 class CustomSkinCluster : public MPxSkinCluster
 {
 public:
+	MStatus compute(const MPlug& plug, MDataBlock& data) override;
 	MStatus deform(MDataBlock& block, MItGeometry& iter, const MMatrix& mat, unsigned int multiIdx) override;
 	static void* creator();
 	static MStatus initialize();
