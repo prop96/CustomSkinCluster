@@ -13,6 +13,8 @@ public:
 	static void* creator();
 	static MStatus initialize();
 
+	inline static const MString nodeTypeName = "customSkinCluster";
+
 public:
 	static const MTypeId id;
 };

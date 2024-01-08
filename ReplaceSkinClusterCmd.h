@@ -16,10 +16,10 @@ public:
 	MStatus undoIt() override;
 	MStatus redoIt() override;
 
+	inline static const MString commandName = "replaceSkcl";
+
 private:
 	MDGModifier dgMod;
-
-	MStatus ReplaceSkinCluster(const MString& newSkclType);
 
 	/// <summary>
 	/// return SkinCluster or CustomSkinCluster node connecting to the given mesh
@@ -50,6 +50,5 @@ private:
 	/// <returns></returns>
 	MStatus ConnectSameAttribute(const MString& attrName, const MFnSkinCluster& src, const MFnSkinCluster& dst);
 
-protected:
-	const MString m_newSkinCluster = "CustomSkinCluster";
+	MStatus ReplaceSkinCluster();
 };

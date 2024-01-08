@@ -1,4 +1,5 @@
 #include "ReplaceSkinClusterCmd.h"
+#include "CustomSkinCluster.h"
 #include <maya/MSelectionList.h>
 #include <maya/MGlobal.h>
 #include <maya/MDagPath.h>
@@ -28,21 +29,20 @@ void* ReplaceSkinClusterCmd::creator()
 
 MStatus ReplaceSkinClusterCmd::doIt(const MArgList&)
 {
-	return ReplaceSkinCluster(m_newSkinCluster);
+	return redoIt();
 }
 
 MStatus ReplaceSkinClusterCmd::undoIt()
 {
-	return ReplaceSkinCluster("skinCluster");
+	return ReplaceSkinCluster();
 }
 
 MStatus ReplaceSkinClusterCmd::redoIt()
 {
-	MArgList argList;
-	return doIt(argList);
+	return ReplaceSkinCluster();
 }
 
-MStatus ReplaceSkinClusterCmd::ReplaceSkinCluster(const MString& newSkclType)
+MStatus ReplaceSkinClusterCmd::ReplaceSkinCluster()
 {
 	MStatus stat;
 
@@ -74,6 +74,7 @@ MStatus ReplaceSkinClusterCmd::ReplaceSkinCluster(const MString& newSkclType)
 		MFnSkinCluster srcSkclFn(srcSkclObj);
 
 		// create the new SkinCluster node
+		MString newSkclType = srcSkclObj.apiType() == MFn::kPluginSkinCluster ? "skinCluster" : CustomSkinCluster::nodeTypeName;
 		MObject dstSkclObj = dgMod.createNode(newSkclType, &stat);
 		CHECK_MSTATUS(stat);
 		MFnSkinCluster dstSkclFn(dstSkclObj);

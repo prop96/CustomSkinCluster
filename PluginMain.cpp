@@ -13,17 +13,17 @@ MStatus initializePlugin(MObject obj)
 	MStatus stat;
 	MFnPlugin plugin(obj, "prop96", "1.0", "Any");
 
-	stat = plugin.registerCommand("ReplaceSkinCluster", ReplaceSkinClusterCmd::creator);
+	stat = plugin.registerCommand(ReplaceSkinClusterCmd::commandName, ReplaceSkinClusterCmd::creator);
 	if (!stat)
 	{
 		stat.perror("registerCommand failed");
 		return stat;
 	}
 
-	stat = plugin.registerNode("CustomSkinCluster", CustomSkinCluster::id, CustomSkinCluster::creator, CustomSkinCluster::initialize, MPxNode::kSkinCluster);
+	stat = plugin.registerNode(CustomSkinCluster::nodeTypeName, CustomSkinCluster::id, CustomSkinCluster::creator, CustomSkinCluster::initialize, MPxNode::kSkinCluster);
 	if (!stat)
 	{
-		stat.perror("registerSkinClusterNode failed");
+		stat.perror("register customSkinCluster Node failed");
 		return stat;
 	}
 
@@ -40,7 +40,7 @@ MStatus uninitializePlugin(MObject obj)
 	MString errStr;
 	MFnPlugin plugin(obj);
 
-	stat = plugin.deregisterCommand("ReplaceSkinCluster");
+	stat = plugin.deregisterCommand(ReplaceSkinClusterCmd::commandName);
 	if (!stat)
 	{
 		stat.perror("deregisterCommand failed");
