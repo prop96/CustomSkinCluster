@@ -17,4 +17,16 @@ public:
 
 public:
 	static const MTypeId id;
+
+	static MObject customSkinningMethod;
+
+private:
+
+	MPoint deformLBS(
+		const MPoint& pt,
+		const MMatrix& worldToLocal,
+		MArrayDataHandle& transformsHandle,
+		MArrayDataHandle& bindHandle,
+		MArrayDataHandle& weightsHandle,
+		MStatus* ptrStat);
 };

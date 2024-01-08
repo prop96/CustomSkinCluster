@@ -7,10 +7,8 @@
 #include <maya/MFnSkinCluster.h>
 #include <maya/MPxSkinCluster.h>
 #include <maya/MItSelectionList.h>
-#include <maya/MPlug.h>
 #include <maya/MItDependencyGraph.h>
-#include <maya/MMatrix.h>
-#include <maya/MFnMatrixData.h>
+#include <maya/MPlug.h>
 #include <cassert>
 
 
@@ -89,6 +87,8 @@ MStatus ReplaceSkinClusterCmd::ReplaceSkinCluster()
 		// copy attribute data by connecting them
 		CHECK_MSTATUS(ConnectSameAttribute("weightList", srcSkclFn, dstSkclFn));
 		CHECK_MSTATUS(ConnectSameAttribute("bindPreMatrix", srcSkclFn, dstSkclFn));
+		CHECK_MSTATUS(ConnectSameAttribute("maxInfluences", srcSkclFn, dstSkclFn));
+		CHECK_MSTATUS(ConnectSameAttribute("maintainMaxInfluences", srcSkclFn, dstSkclFn));
 
 		// finally, delete the old SkinCluster node
 		CHECK_MSTATUS(dgMod.doIt());
