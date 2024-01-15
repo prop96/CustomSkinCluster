@@ -1,0 +1,190 @@
+global proc string[] filter_by_type( string $type, string $objects[] )
+{
+    string $new_list[];
+    for ($node in $objects) {
+        if( $node != ""){
+            if( nodeType( $node ) == $type ){
+                $new_list[size($new_list)] = $node;
+            }
+        }
+    }
+    return $new_list;
+}
+ 
+ 
+/// @true if '$elt' is present in '$array'
+global proc int exists_s(string $array[], string $elt) {
+    return stringArrayContains($elt, $array);
+}
+ 
+global proc push_s(string $array[], string $elt){
+    $array[ size($array) ] = $elt;
+}
+ 
+/// Add '$elt' only if it doesn't exist in '$array'
+global proc push_unique_s(string $array[], string $elt){
+    if( !exists_s( $array, $elt ) ){
+        push_s($array, $elt);
+    }
+}
+ 
+global proc string[] get_shapes( string $xform[] )
+{
+    string $shapes[];
+    for ($node in $xform) {
+        $shapes[size($shapes)] = get_shape($node);
+    }
+    return $shapes;
+}
+ 
+global proc string get_shape( string $xform )
+{
+    string $shape;
+    if ( "transform" == `nodeType $xform` ) {
+        string $parents[] = `listRelatives -fullPath -shapes $xform`;
+        if( size($parents) > 0) {
+            $shape = $parents[0];
+        }
+    } else {
+        // Assume it's already a shape;
+        $shape = $xform;
+    }
+ 
+    return $shape;
+}
+ 
+global proc string get_transform(string $shape)
+{
+    string $transfo;
+    if ( "transform" != `nodeType $shape` )
+    {
+        string $parents[] = `listRelatives -fullPath -parent $shape`;
+        if( size($parents) > 0)
+            $transfo = $parents[0];
+    }else{
+        // If given node is already a transform, just pass on through
+        $transfo = $shape;
+    }
+    return $transfo;
+}
+ 
+// @return the list of selected meshes (first element is the active selection
+// if any)
+global proc string[] get_selected_meshes()
+{
+    // -objectsOnly because with component selection (vertex, face, etc.) it
+    // will return the list of selected components, however, in some cases the
+    // shape and tranform are both returned.
+    string $sel[] = `ls -selection -objectsOnly -long`;
+    // When converting to shape we might have duplicates
+    $sel = get_shapes($sel);
+    // remove those duplicates:
+    string $list[];
+    for( $i = 0; $i < size($sel); $i++ ){
+        // Notice we reverse the order to garantee the active selection
+        // comes first in the list
+        push_unique_s($list, $sel[size($sel)-1-$i]);
+    }
+ 
+    return filter_by_type("mesh", $list);
+}
+ 
+ 
+///@return empty string if cannot find any skin cluster.
+global proc string find_skin_cluster_from_mesh(string $mesh_name)
+{
+    // Try to walk through the dependency graph to find the first
+    // skin cluster(s) starting from the $mesh_name node.
+    string $to_visit[] = {get_shape($mesh_name)};// < our stack of node left to visit.
+    int $size = 1; // < our stack pointer.
+    string $visited[] = {};
+    while($size > 0)
+    {
+        $size = $size-1;
+        string $obj = $to_visit[$size];
+        push_s($visited, $obj);
+        string $types[] = `nodeType -inherited $obj`;
+ 
+        if( exists_s($types, "skinCluster") )
+        {
+            return $obj;
+        }
+        else
+        {
+            string $list_objs[] = `listConnections -source true -destination false -plugs false $obj`;
+            for($obj in $list_objs)
+            {
+                if( !exists_s( $visited, $obj )  ){
+                    $to_visit[$size] = $obj;
+                    $size = $size + 1;
+                }
+            }
+        }
+    }
+ 
+    return "";
+}
+
+// Functions such as get_selected_meshes(), find_skin_cluster_from_mesh() are
+// utilities I define below
+ 
+proc connectJointCluster( string $jointName,
+                          int $jointIndex,
+                          string $srcSkinCluster,
+                          string $dstSkinCluster )
+{
+    int $i = $jointIndex;
+    print("joint: "+$i+" : "+$jointName+"\n" );
+    if ( !objExists( $jointName+".lockInfluenceWeights" ) )
+    {
+        connectAttr ($jointName+".liw") ($dstSkinCluster + ".lockWeights["+$i+"]");
+    }
+ 
+    connectAttr ($jointName+".worldMatrix[0]") ($dstSkinCluster + ".matrix["+$i+"]");
+    connectAttr ($jointName+".objectColorRGB") ($dstSkinCluster + ".influenceColor["+$i+"]");
+ 
+    float $m[] = `getAttr ($jointName+".wim")`;
+    // todo prefer using this instead:
+    //float $m[] = `getAttr ($srcSkinCluster + ".bindPreMatrix["+$i+"]")`;
+ 
+ 
+    setAttr ($dstSkinCluster + ".bindPreMatrix["+$i+"]") -type "matrix" $m[0] $m[1] $m[2] $m[3] $m[4] $m[5] $m[6] $m[7] $m[8] $m[9] $m[10] $m[11] $m[12] $m[13] $m[14] $m[15];
+}
+ 
+global proc ConvertToCustomSkinCluster()
+{
+    string $mesh_list[] = get_selected_meshes();
+    if( size( $mesh_list ) < 1 ){
+        return;
+    }
+ 
+    // Last selected mesh comes first in the list
+    string $mesh = $mesh_list[0];
+    string $cluster = find_skin_cluster_from_mesh( get_transform($mesh) );
+ 
+    if( $cluster == "" ){
+        return;
+    }
+ 
+    // Get joints influencing the mesh:
+    int $joint_indices[] = `getAttr -multiIndices ($cluster+".matrix")`;
+    string $joint_names[] = `listConnections ($cluster+".matrix")`;
+ 
+    // Create custom skin cluster:
+    string $deformers[] = `deformer -type "customSkinCluster"`;
+    string $customSkinCluster = $deformers[0];
+ 
+    // Link joints and copy bind pose matrices from the source skin cluster:
+    for( $i = 0; $i < size($joint_indices); ++$i) {
+        int $j_idx = $joint_indices[$i];
+        string $j_name = $joint_names[$i];
+        connectJointCluster( $j_name, $j_idx , $cluster, $customSkinCluster );
+    }
+ 
+    // connect skin weights to force copy:
+    connectAttr ($cluster+".weightList") ($customSkinCluster+".weightList");
+ 
+    delete $cluster;
+}
+ 
+ConvertToCustomSkinCluster();

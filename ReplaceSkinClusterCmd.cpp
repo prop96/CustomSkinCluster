@@ -139,20 +139,10 @@ MStatus ReplaceSkinClusterCmd::ReplaceConnectionToJoints(const MFnSkinCluster& s
 	MStatus returnStatus;
 
 	// get all the joints from the matrix attribute
-	MPlug matrixSrc = src.findPlug("matrix", true, &returnStatus);
+	MPlug matrixSrc = src.findPlug("matrix", &returnStatus);
 	CHECK_MSTATUS(returnStatus);
-
-	// allocate the array buffers for the new SkinCluster
-	unsigned int numJoints = matrixSrc.numElements();
-	MPlug matrixDst = dst.findPlug("matrix", true, &returnStatus);
+	unsigned int numJoints = matrixSrc.numElements(&returnStatus);
 	CHECK_MSTATUS(returnStatus);
-	CHECK_MSTATUS(matrixDst.setNumElements(numJoints));
-	MPlug lockWeightsDst = dst.findPlug("lockWeights", true, &returnStatus);
-	CHECK_MSTATUS(returnStatus);
-	CHECK_MSTATUS(lockWeightsDst.setNumElements(numJoints));
-	MPlug influenceColorDst = dst.findPlug("influenceColor", true, &returnStatus);
-	CHECK_MSTATUS(returnStatus);
-	CHECK_MSTATUS(influenceColorDst.setNumElements(numJoints));
 
 	for (unsigned int matIdx = 0; matIdx < numJoints; matIdx++)
 	{
@@ -162,6 +152,7 @@ MStatus ReplaceSkinClusterCmd::ReplaceConnectionToJoints(const MFnSkinCluster& s
 		// if matrix[idx] plug is connected as destination, the source plug should be a joint
 		if (!matrixElemPlug.isDestination(&returnStatus))
 		{
+			CHECK_MSTATUS(returnStatus);
 			continue;
 		}
 		CHECK_MSTATUS(returnStatus);
@@ -181,15 +172,21 @@ MStatus ReplaceSkinClusterCmd::ReplaceConnectionToJoints(const MFnSkinCluster& s
 		// - joint.objectColorRGB -> newSkinCluster.influenceColor[matIdx]
 		{
 			MPlug worldMatrix = jointPlugs[0];
+			MPlug matrixDst = dst.findPlug("matrix", &returnStatus);
+			CHECK_MSTATUS(returnStatus);
 			CHECK_MSTATUS(dgMod.connect(worldMatrix, matrixDst.elementByLogicalIndex(matIdx, &returnStatus)));
 		}
 		{
-			MPlug liw = jointFn.findPlug("liw", true, &returnStatus);
+			MPlug liw = jointFn.findPlug("liw", &returnStatus);
+			CHECK_MSTATUS(returnStatus);
+			MPlug lockWeightsDst = dst.findPlug("lockWeights", &returnStatus);
 			CHECK_MSTATUS(returnStatus);
 			CHECK_MSTATUS(dgMod.connect(liw, lockWeightsDst.elementByLogicalIndex(matIdx, &returnStatus)));
 		}
 		{
-			MPlug objColor = jointFn.findPlug("objectColorRGB", true, &returnStatus);
+			MPlug objColor = jointFn.findPlug("objectColorRGB", &returnStatus);
+			CHECK_MSTATUS(returnStatus);
+			MPlug influenceColorDst = dst.findPlug("influenceColor", &returnStatus);
 			CHECK_MSTATUS(returnStatus);
 			CHECK_MSTATUS(dgMod.connect(objColor, influenceColorDst.elementByLogicalIndex(matIdx, &returnStatus)));
 		}

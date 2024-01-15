@@ -4,6 +4,7 @@
 #include <maya/MDataBlock.h>
 #include <maya/MItGeometry.h>
 #include <maya/MMatrix.h>
+#include <unordered_map>
 
 class CustomSkinCluster : public MPxSkinCluster
 {
@@ -19,8 +20,13 @@ public:
 	static const MTypeId id;
 
 	static MObject customSkinningMethod;
+	static MObject pstarArray_CoR;
 
 private:
+
+	// skin weight as an unordered map, whose key is the bone idx
+	using weight_map = std::unordered_map<unsigned int, float>;
+	double ComputeSimilarlityForCoR(const weight_map& w0, const weight_map& w1, double sigma);
 
 	MPoint deformLBS(
 		const MPoint& pt,
