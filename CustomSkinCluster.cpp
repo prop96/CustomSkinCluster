@@ -150,23 +150,23 @@ MStatus CustomSkinCluster::compute(const MPlug& plug, MDataBlock& data)
 
 MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MMatrix& localToWorld, unsigned int multiIdx)
 {
-	MStatus stat;
+	MStatus returnStat;
 
 	// get the joint transforms
-	MArrayDataHandle transformsHandle = block.inputArrayValue(matrix, &stat);
-	CHECK_MSTATUS(stat);
-	int numTransforms = transformsHandle.elementCount(&stat); // = # of joints
-	CHECK_MSTATUS(stat);
+	MArrayDataHandle transformsHandle = block.inputArrayValue(matrix, &returnStat);
+	CHECK_MSTATUS(returnStat);
+	int numTransforms = transformsHandle.elementCount(&returnStat); // = # of joints
+	CHECK_MSTATUS(returnStat);
 	if (numTransforms == 0)
 	{
 		return MS::kSuccess;
 	}
 
-	MArrayDataHandle bindHandle = block.inputArrayValue(bindPreMatrix, &stat);
-	CHECK_MSTATUS(stat);
+	MArrayDataHandle bindHandle = block.inputArrayValue(bindPreMatrix, &returnStat);
+	CHECK_MSTATUS(returnStat);
 
-	MArrayDataHandle weightListsHandle = block.inputArrayValue(weightList, &stat);
-	CHECK_MSTATUS(stat);
+	MArrayDataHandle weightListsHandle = block.inputArrayValue(weightList, &returnStat);
+	CHECK_MSTATUS(returnStat);
 	int numWeightLists = weightListsHandle.elementCount(); // = # of points
 	if (numWeightLists == 0)
 	{
@@ -182,19 +182,19 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 		MPoint pt = iter.position();
 
 		// get the weights for this point
-		MArrayDataHandle weightsHandle = weightListsHandle.inputValue(&stat).child(weights);
-		CHECK_MSTATUS(stat);
+		MArrayDataHandle weightsHandle = weightListsHandle.inputValue(&returnStat).child(weights);
+		CHECK_MSTATUS(returnStat);
 
 		// compute the skinned position
-		MPoint skinned = deformLBS(pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &stat);
-		CHECK_MSTATUS(stat);
+		MPoint skinned = deformLBS(pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
+		CHECK_MSTATUS(returnStat);
 		CHECK_MSTATUS(iter.setPosition(skinned));
 
 		// advance the weight list handle
 		CHECK_MSTATUS(weightListsHandle.next());
 	}
 
-	return stat;
+	return returnStat;
 }
 
 void* CustomSkinCluster::creator()
@@ -204,18 +204,18 @@ void* CustomSkinCluster::creator()
 
 MStatus CustomSkinCluster::initialize()
 {
-	MStatus stat;
+	MStatus returnStat;
 
 	MFnEnumAttribute eAttr;
-	customSkinningMethod = eAttr.create("customSkinningMethod", "cskMethod", 0, &stat);
-	CHECK_MSTATUS(stat);
+	customSkinningMethod = eAttr.create("customSkinningMethod", "cskMethod", 0, &returnStat);
+	CHECK_MSTATUS(returnStat);
 	CHECK_MSTATUS(eAttr.addField("LBS", 0));
 	CHECK_MSTATUS(eAttr.addField("DQS", 1));
 	CHECK_MSTATUS(addAttribute(customSkinningMethod));
 
 	MFnNumericAttribute nAttr;
-	pstarArray_CoR = nAttr.createPoint("pstarArray_CoR", "pstars", &stat);
-	CHECK_MSTATUS(stat);
+	pstarArray_CoR = nAttr.createPoint("pstarArray_CoR", "pstars", &returnStat);
+	CHECK_MSTATUS(returnStat);
 	nAttr.setArray(true);
 	//nAttr.setWritable(false);
 	addAttribute(pstarArray_CoR);

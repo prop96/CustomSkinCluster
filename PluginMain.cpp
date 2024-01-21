@@ -1,5 +1,7 @@
 #include "ReplaceSkinClusterCmd.h"
+#include "InsertDeformerCmd.h"
 #include "CustomSkinCluster.h"
+#include "CustomDeltaMushDeformer.h"
 #include <maya/MFnPlugin.h>
 
 
@@ -10,24 +12,38 @@
 //
 MStatus initializePlugin(MObject obj)
 {
-	MStatus stat;
+	MStatus returnStat;
 	MFnPlugin plugin(obj, "prop96", "1.0", "Any");
 
-	stat = plugin.registerCommand(ReplaceSkinClusterCmd::commandName, ReplaceSkinClusterCmd::creator);
-	if (!stat)
+	returnStat = plugin.registerCommand(ReplaceSkinClusterCmd::commandName, ReplaceSkinClusterCmd::creator);
+	if (!returnStat)
 	{
-		stat.perror("registerCommand failed");
-		return stat;
+		returnStat.perror("registerCommand failed");
+		return returnStat;
 	}
 
-	stat = plugin.registerNode(CustomSkinCluster::nodeTypeName, CustomSkinCluster::id, CustomSkinCluster::creator, CustomSkinCluster::initialize, MPxNode::kSkinCluster);
-	if (!stat)
+	returnStat = plugin.registerNode(CustomSkinCluster::nodeTypeName, CustomSkinCluster::id, CustomSkinCluster::creator, CustomSkinCluster::initialize, MPxNode::kSkinCluster);
+	if (!returnStat)
 	{
-		stat.perror("register customSkinCluster Node failed");
-		return stat;
+		returnStat.perror("register customSkinCluster Node failed");
+		return returnStat;
 	}
 
-	return stat;
+	returnStat = plugin.registerCommand(InsertDeformerCmd::commandName, InsertDeformerCmd::creator);
+	if (!returnStat)
+	{
+		returnStat.perror("registerCommand failed");
+		return returnStat;
+	}
+
+	returnStat = plugin.registerNode(CustomDeltaMushDeformer::nodeTypeName, CustomDeltaMushDeformer::id, CustomDeltaMushDeformer::creator, CustomDeltaMushDeformer::initialize, MPxNode::kDeformerNode);
+	if (!returnStat)
+	{
+		returnStat.perror("register customSkinCluster Node failed");
+		return returnStat;
+	}
+
+	return returnStat;
 }
 
 // The unitializePlugin is called when Maya needs to unload the plugin.
@@ -36,23 +52,30 @@ MStatus initializePlugin(MObject obj)
 //
 MStatus uninitializePlugin(MObject obj)
 {
-	MStatus stat;
+	MStatus returnStat;
 	MString errStr;
 	MFnPlugin plugin(obj);
 
-	stat = plugin.deregisterCommand(ReplaceSkinClusterCmd::commandName);
-	if (!stat)
+	returnStat = plugin.deregisterCommand(ReplaceSkinClusterCmd::commandName);
+	if (!returnStat)
 	{
-		stat.perror("deregisterCommand failed");
-		return stat;
+		returnStat.perror("deregisterCommand failed");
+		return returnStat;
 	}
 
-	stat = plugin.deregisterNode(CustomSkinCluster::id);
-	if (!stat)
+	returnStat = plugin.deregisterNode(CustomSkinCluster::id);
+	if (!returnStat)
 	{
-		stat.perror("deregisterNode failed");
-		return stat;
+		returnStat.perror("deregisterNode failed");
+		return returnStat;
 	}
 
-	return stat;
+	returnStat = plugin.deregisterCommand(InsertDeformerCmd::commandName);
+	if (!returnStat)
+	{
+		returnStat.perror("deregisterCommand failed");
+		return returnStat;
+	}
+
+	return returnStat;
 }

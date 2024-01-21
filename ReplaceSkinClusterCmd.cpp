@@ -42,15 +42,15 @@ MStatus ReplaceSkinClusterCmd::redoIt()
 
 MStatus ReplaceSkinClusterCmd::ReplaceSkinCluster()
 {
-	MStatus stat;
+	MStatus returnStat;
 
 	// get selected objects
 	MSelectionList selection;
 	CHECK_MSTATUS(MGlobal::getActiveSelectionList(selection));
-	unsigned int numSelection = selection.length(&stat);
+	unsigned int numSelection = selection.length(&returnStat);
 	if (numSelection == 0)
 	{
-		return stat;
+		return returnStat;
 	}
 
 	// find SkinCluster nodes of the selected objects
@@ -63,8 +63,8 @@ MStatus ReplaceSkinClusterCmd::ReplaceSkinCluster()
 		CHECK_MSTATUS(dagPath.extendToShape());
 
 		// get the current SkinCluster node
-		MObject srcSkclObj = FindSkinClusterNode(dagPath, &stat);
-		CHECK_MSTATUS(stat);
+		MObject srcSkclObj = FindSkinClusterNode(dagPath, &returnStat);
+		CHECK_MSTATUS(returnStat);
 		if (srcSkclObj.isNull())
 		{
 			continue;
@@ -73,8 +73,8 @@ MStatus ReplaceSkinClusterCmd::ReplaceSkinCluster()
 
 		// create the new SkinCluster node
 		MString newSkclType = srcSkclObj.apiType() == MFn::kPluginSkinCluster ? "skinCluster" : CustomSkinCluster::nodeTypeName;
-		MObject dstSkclObj = dgMod.createNode(newSkclType, &stat);
-		CHECK_MSTATUS(stat);
+		MObject dstSkclObj = dgMod.createNode(newSkclType, &returnStat);
+		CHECK_MSTATUS(returnStat);
 		MFnSkinCluster dstSkclFn(dstSkclObj);
 
 		// connect input and output
