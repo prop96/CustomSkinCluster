@@ -1,10 +1,12 @@
 #include "CustomDeltaMushDeformer.h"
+#include "DeltaMushUtil.h"
 #include <maya/MFnUnitAttribute.h>
 #include <maya/MDistance.h>
 #include <maya/MPoint.h>
 #include <maya/MItMeshVertex.h>
 #include <maya/MPointArray.h>
 #include <maya/MFnTypedAttribute.h>
+#include <maya/MFnMatrixArrayData.h>
 #include <cassert>
 
 /*
@@ -14,8 +16,7 @@
 
 // instancing the static fields
 MTypeId CustomDeltaMushDeformer::id(0x80095);
-MObject CustomDeltaMushDeformer::startDist;
-MObject CustomDeltaMushDeformer::matricesR;
+MObject CustomDeltaMushDeformer::deltaMushMatrix;
 
 MStatus CustomDeltaMushDeformer::compute(const MPlug& plug, MDataBlock& data)
 {
@@ -25,47 +26,41 @@ MStatus CustomDeltaMushDeformer::compute(const MPlug& plug, MDataBlock& data)
 	return MPxDeformerNode::compute(plug, data);
 }
 
-MStatus SmoothMesh(MObject& mesh, const MPointArray& original, MPointArray& smoothed)
-{
-	const unsigned int numVerts = original.length();
-	smoothed.setLength(numVerts);
-
-	MItMeshVertex itVertex(mesh);
-	for (itVertex.reset(); !itVertex.isDone(); itVertex.next())
-	{
-		MPoint pos(0, 0, 0);
-
-		MIntArray connected;
-		itVertex.getConnectedVertices(connected);
-		const unsigned int numConnected = connected.length();
-		assert(numConnected > 0);
-		for (const int vidx : connected)
-		{
-			pos += original[vidx];
-		}
-		
-		smoothed[itVertex.index()] = pos / numConnected;
-	}
-}
-
 MStatus CustomDeltaMushDeformer::deform(MDataBlock& data, MItGeometry& iter, const MMatrix& localToWorld, unsigned int multiIdx)
 {
 	MStatus returnStat;
 
-	//MObject originalMesh = data.inputArrayValue()
-
-	// get all the positions of the vertices
-	MPointArray skinnedPoints;
-	iter.allPositions(skinnedPoints);
-
 	// get the attribute instance of input[0].inputGeometry
 	MObject skinnedMesh = data.inputArrayValue(input).inputValue().child(inputGeom).data();
 
-	// store the new positions
-	MPointArray skinnedSmoothed;
-	SmoothMesh(skinnedMesh, skinnedPoints, skinnedSmoothed);
+	// get all the positions of the vertices
+	MFnMesh meshFn(skinnedMesh);
+	MPointArray skinnedPoints;
+	meshFn.getPoints(skinnedPoints);
 
-	iter.setAllPositions(skinnedSmoothed);
+	// get the deltaMushMatrix plug
+	MArrayDataHandle dmMatsObj = data.inputArrayValue(deltaMushMatrix);;
+	//MFnMatrixArrayData matArrayFn(dmMatsObj);
+	//MMatrixArray dmMats = matArrayFn.array();
+	int num = dmMatsObj.elementCount();
+	cout << num << endl;
+
+	MItMeshVertex itVertex(skinnedMesh);
+	for (itVertex.reset(); !itVertex.isDone(); itVertex.next())
+	{
+		auto pos = itVertex.position();
+
+		//MMatrix inv = dmMats[itVertex.index()].inverse();
+		//MMatrix inv = dmMatsObj.inputValue().asMatrix();
+		dmMatsObj.next();
+		MMatrix inv; inv.setToIdentity();
+
+		MMatrix mat;
+		DMUtil::CreateDeltaMushMatrix(mat, itVertex, meshFn, skinnedPoints);
+
+		pos = pos * inv * mat;
+		iter.setPosition(pos);
+	}
 
 	return returnStat;
 }
@@ -79,14 +74,13 @@ MStatus CustomDeltaMushDeformer::initialize()
 {
 	MStatus returnStat;
 
-	MFnTypedAttribute tattrFn;
+	MFnTypedAttribute tAttr;
 
-	matricesR = tattrFn.create("matricesR", "Rmat", MFnData::kMatrixArray, &returnStat);
+	deltaMushMatrix = tAttr.create("deltaMushMatrix", "dmMat", MFnData::kMatrixArray, MObject::kNullObj, &returnStat);
 	CHECK_MSTATUS(returnStat);
-	CHECK_MSTATUS(addAttribute(matricesR));
+	CHECK_MSTATUS(addAttribute(deltaMushMatrix));
 
-	CHECK_MSTATUS(attributeAffects(inputGeom, matricesR));
-	CHECK_MSTATUS(attributeAffects(matricesR, outputGeom));
+	CHECK_MSTATUS(attributeAffects(deltaMushMatrix, outputGeom));
 
 	return returnStat;
 }

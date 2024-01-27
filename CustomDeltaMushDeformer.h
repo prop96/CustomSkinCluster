@@ -15,10 +15,7 @@ public:
 	static MStatus initialize();
 
 public:
-	static MObject startDist;
-	static MObject matricesR;
-
-	MMatrixArray matrices;
+	static MObject deltaMushMatrix;
 
 	static MTypeId id;
 
