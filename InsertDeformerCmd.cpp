@@ -77,7 +77,7 @@ MStatus InsertDeformerCmd::InsertNode()
 		CHECK_MSTATUS(ConnectSameAttribute("weightList", skclFn, deformerFn));
 		CHECK_MSTATUS(ConnectSameAttribute("originalGeometry[0]", skclFn, deformerFn));
 		CHECK_MSTATUS(ReplaceConnection("outputGeometry[0]", skclFn, deformerFn, false));
-		CHECK_MSTATUS(ConnectAttribute("outputGeometry[0]", skclFn, "originalGeometry", precompFn));
+		CHECK_MSTATUS(ConnectAttribute("originalGeometry[0]", skclFn, "originalGeometry", precompFn));
 		CHECK_MSTATUS(ConnectAttribute("outputGeometry[0]", skclFn, "input[0].inputGeometry", deformerFn));
 	}
 

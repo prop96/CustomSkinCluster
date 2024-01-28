@@ -2,6 +2,7 @@
 #include "DeltaMushUtil.h"
 #include <maya/MItMeshVertex.h>
 #include <maya/MFnTypedAttribute.h>
+#include <maya/MFnMatrixAttribute.h>
 #include <maya/MMatrix.h>
 #include <maya/MVector.h>
 #include <maya/MFnMatrixData.h>
@@ -39,23 +40,24 @@ MStatus PrecomputeCustomSkinningNode::compute(const MPlug& plug, MDataBlock& dat
 		MPointArray points;
 		meshFn.getPoints(points);
 
-		MObject matArrayObj = data.outputValue(deltaMushMatrix).data();//plug.asMObject(&returnStat);
-		MFnMatrixArrayData matArrayFn;
-		CHECK_MSTATUS(matArrayFn.setObject(matArrayObj));
-
-		MMatrixArray matArray = matArrayFn.array();
-		int num = points.length();
-		matArray.setLength(points.length());
+		MArrayDataHandle arrayHandle = data.outputArrayValue(deltaMushMatrix, &returnStat);
+		CHECK_MSTATUS(returnStat);
+		MArrayDataBuilder arrayBuilder = arrayHandle.builder(&returnStat);
+		CHECK_MSTATUS(returnStat);
 
 		// compute the "delta from mush" for each vertices
 		for (itVertex.reset(); !itVertex.isDone(); itVertex.next())
 		{
-			DMUtil::CreateDeltaMushMatrix(matArray[itVertex.index()], itVertex, meshFn, points);
+			MDataHandle handle = arrayBuilder.addElement(itVertex.index(), &returnStat);
+			CHECK_MSTATUS(returnStat);
+
+			MMatrix mat;
+			CHECK_MSTATUS(DMUtil::CreateDeltaMushMatrix(mat, itVertex, meshFn, points));
+
+			handle.setMMatrix(mat);
 		}
 
-		CHECK_MSTATUS(matArrayFn.set(matArray));
-		int num2 = matArrayFn.length();
-		cout << num2 << endl;
+		CHECK_MSTATUS(arrayHandle.set(arrayBuilder));
 
 		// clean the dirty flag of the plug
 		CHECK_MSTATUS(data.setClean(plug));
@@ -85,12 +87,14 @@ MStatus PrecomputeCustomSkinningNode::initialize()
 	MStatus returnStat;
 
 	MFnTypedAttribute tAttr;
-
 	originalGeometry = tAttr.create("originalGeometry", "origGeom", MFnData::kMesh, MObject::kNullObj, &returnStat);
 	CHECK_MSTATUS(returnStat);
-	deltaMushMatrix = tAttr.create("deltaMushMatrix", "dmMat", MFnData::kMatrixArray, MObject::kNullObj, &returnStat);
+
+	MFnMatrixAttribute mAttr;
+	deltaMushMatrix = mAttr.create("deltaMushMatrix", "dmMat", MFnMatrixAttribute::kDouble, &returnStat);
 	CHECK_MSTATUS(returnStat);
-	//CHECK_MSTATUS(tAttr.setUsesArrayDataBuilder(true));
+	CHECK_MSTATUS(mAttr.setArray(true));
+	CHECK_MSTATUS(mAttr.setUsesArrayDataBuilder(true));
 
 	CHECK_MSTATUS(addAttribute(originalGeometry));
 	CHECK_MSTATUS(addAttribute(deltaMushMatrix));

@@ -7,6 +7,7 @@
 #include <maya/MPointArray.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnMatrixArrayData.h>
+#include <maya/MFnMatrixAttribute.h>
 #include <cassert>
 
 /*
@@ -39,10 +40,9 @@ MStatus CustomDeltaMushDeformer::deform(MDataBlock& data, MItGeometry& iter, con
 	meshFn.getPoints(skinnedPoints);
 
 	// get the deltaMushMatrix plug
-	MArrayDataHandle dmMatsObj = data.inputArrayValue(deltaMushMatrix);;
-	//MFnMatrixArrayData matArrayFn(dmMatsObj);
-	//MMatrixArray dmMats = matArrayFn.array();
-	int num = dmMatsObj.elementCount();
+	MArrayDataHandle dmArrayHandle = data.inputArrayValue(deltaMushMatrix, &returnStat);
+	CHECK_MSTATUS(returnStat);
+	int num = dmArrayHandle.elementCount();
 	cout << num << endl;
 
 	MItMeshVertex itVertex(skinnedMesh);
@@ -50,10 +50,11 @@ MStatus CustomDeltaMushDeformer::deform(MDataBlock& data, MItGeometry& iter, con
 	{
 		auto pos = itVertex.position();
 
-		//MMatrix inv = dmMats[itVertex.index()].inverse();
-		//MMatrix inv = dmMatsObj.inputValue().asMatrix();
-		dmMatsObj.next();
-		MMatrix inv; inv.setToIdentity();
+		CHECK_MSTATUS(dmArrayHandle.jumpToElement(itVertex.index()));
+
+		MMatrix inv = dmArrayHandle.inputValue(&returnStat).asMatrix();
+		CHECK_MSTATUS(returnStat);
+		inv = inv.inverse();
 
 		MMatrix mat;
 		DMUtil::CreateDeltaMushMatrix(mat, itVertex, meshFn, skinnedPoints);
@@ -74,10 +75,14 @@ MStatus CustomDeltaMushDeformer::initialize()
 {
 	MStatus returnStat;
 
-	MFnTypedAttribute tAttr;
+	//MFnTypedAttribute tAttr;
+	//deltaMushMatrix = tAttr.create("deltaMushMatrix", "dmMat", MFnData::kMatrixArray, MObject::kNullObj, &returnStat);
 
-	deltaMushMatrix = tAttr.create("deltaMushMatrix", "dmMat", MFnData::kMatrixArray, MObject::kNullObj, &returnStat);
+	MFnMatrixAttribute mAttr;
+	deltaMushMatrix = mAttr.create("deltaMushMatrix", "dmMat", MFnMatrixAttribute::kDouble, &returnStat);
 	CHECK_MSTATUS(returnStat);
+	CHECK_MSTATUS(mAttr.setArray(true));
+
 	CHECK_MSTATUS(addAttribute(deltaMushMatrix));
 
 	CHECK_MSTATUS(attributeAffects(deltaMushMatrix, outputGeom));
