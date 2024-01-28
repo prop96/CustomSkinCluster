@@ -45,22 +45,28 @@ MStatus CustomDeltaMushDeformer::deform(MDataBlock& data, MItGeometry& iter, con
 	int num = dmArrayHandle.elementCount();
 	cout << num << endl;
 
+	MPointArray deformed;
+	deformed.setLength(num);
+
 	MItMeshVertex itVertex(skinnedMesh);
 	for (itVertex.reset(); !itVertex.isDone(); itVertex.next())
 	{
-		auto pos = itVertex.position();
-
 		CHECK_MSTATUS(dmArrayHandle.jumpToElement(itVertex.index()));
 
-		MMatrix inv = dmArrayHandle.inputValue(&returnStat).asMatrix();
+		MMatrix inv = dmArrayHandle.inputValue(&returnStat).asMatrix().inverse();
 		CHECK_MSTATUS(returnStat);
-		inv = inv.inverse();
 
 		MMatrix mat;
-		DMUtil::CreateDeltaMushMatrix(mat, itVertex, meshFn, skinnedPoints);
+		CHECK_MSTATUS(DMUtil::CreateDeltaMushMatrix(mat, itVertex, meshFn, skinnedPoints));
 
+		MPoint pos = itVertex.position();
 		pos = pos * inv * mat;
-		iter.setPosition(pos);
+		deformed[itVertex.index()] = pos;
+	}
+
+	for (iter.reset(); !iter.isDone(); iter.next())
+	{
+		iter.setPosition(deformed[iter.index()]);
 	}
 
 	return returnStat;

@@ -34,8 +34,6 @@ MStatus PrecomputeCustomSkinningNode::compute(const MPlug& plug, MDataBlock& dat
 	{
 		MObject mesh = data.inputValue(originalGeometry).data();
 
-		MItMeshVertex itVertex(mesh);
-
 		MFnMesh meshFn(mesh);
 		MPointArray points;
 		meshFn.getPoints(points);
@@ -46,13 +44,14 @@ MStatus PrecomputeCustomSkinningNode::compute(const MPlug& plug, MDataBlock& dat
 		CHECK_MSTATUS(returnStat);
 
 		// compute the "delta from mush" for each vertices
+		MItMeshVertex itVertex(mesh);
 		for (itVertex.reset(); !itVertex.isDone(); itVertex.next())
 		{
-			MDataHandle handle = arrayBuilder.addElement(itVertex.index(), &returnStat);
-			CHECK_MSTATUS(returnStat);
-
 			MMatrix mat;
 			CHECK_MSTATUS(DMUtil::CreateDeltaMushMatrix(mat, itVertex, meshFn, points));
+
+			MDataHandle handle = arrayBuilder.addElement(itVertex.index(), &returnStat);
+			CHECK_MSTATUS(returnStat);
 
 			handle.setMMatrix(mat);
 		}
