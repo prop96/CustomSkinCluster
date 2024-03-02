@@ -1,8 +1,5 @@
 #include "ReplaceSkinClusterCmd.h"
-#include "InsertDeformerCmd.h"
 #include "CustomSkinCluster.h"
-#include "CustomDeltaMushDeformer.h"
-#include "PrecomputeCustomSkinningNode.h"
 #include <maya/MFnPlugin.h>
 
 
@@ -30,27 +27,6 @@ MStatus initializePlugin(MObject obj)
 		return returnStat;
 	}
 
-	returnStat = plugin.registerCommand(InsertDeformerCmd::commandName, InsertDeformerCmd::creator);
-	if (!returnStat)
-	{
-		returnStat.perror("registerCommand failed");
-		return returnStat;
-	}
-
-	returnStat = plugin.registerNode(CustomDeltaMushDeformer::nodeTypeName, CustomDeltaMushDeformer::id, CustomDeltaMushDeformer::creator, CustomDeltaMushDeformer::initialize, MPxNode::kDeformerNode);
-	if (!returnStat)
-	{
-		returnStat.perror("register customSkinCluster Node failed");
-		return returnStat;
-	}
-
-	returnStat = plugin.registerNode(PrecomputeCustomSkinningNode::nodeTypeName, PrecomputeCustomSkinningNode::id, PrecomputeCustomSkinningNode::creator, PrecomputeCustomSkinningNode::initialize);
-	if (!returnStat)
-	{
-		returnStat.perror("register precompute Node failed");
-		return returnStat;
-	}
-
 	return returnStat;
 }
 
@@ -72,27 +48,6 @@ MStatus uninitializePlugin(MObject obj)
 	}
 
 	returnStat = plugin.deregisterNode(CustomSkinCluster::id);
-	if (!returnStat)
-	{
-		returnStat.perror("deregisterNode failed");
-		return returnStat;
-	}
-
-	returnStat = plugin.deregisterCommand(InsertDeformerCmd::commandName);
-	if (!returnStat)
-	{
-		returnStat.perror("deregisterCommand failed");
-		return returnStat;
-	}
-
-	returnStat = plugin.deregisterNode(CustomDeltaMushDeformer::id);
-	if (!returnStat)
-	{
-		returnStat.perror("deregisterNode failed");
-		return returnStat;
-	}
-
-	returnStat = plugin.deregisterNode(PrecomputeCustomSkinningNode::id);
 	if (!returnStat)
 	{
 		returnStat.perror("deregisterNode failed");
