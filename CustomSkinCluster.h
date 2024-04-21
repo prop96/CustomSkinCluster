@@ -20,7 +20,6 @@ public:
 	static const MTypeId id;
 
 	static MObject customSkinningMethod;
-	static MObject pstarArray_CoR;
 
 private:
 
