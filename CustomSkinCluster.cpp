@@ -6,6 +6,7 @@
 #include <maya/MPoint.h>
 #include <vector>
 
+
 namespace
 {
 	enum class SkinningType : short
@@ -98,11 +99,6 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 	}
 
 	return returnStat;
-}
-
-void* CustomSkinCluster::creator()
-{
-	return new CustomSkinCluster();
 }
 
 MStatus CustomSkinCluster::initialize()

@@ -11,7 +11,6 @@ class CustomSkinCluster : public MPxSkinCluster
 {
 public:
 	MStatus deform(MDataBlock& block, MItGeometry& iter, const MMatrix& mat, unsigned int multiIdx) override;
-	static void* creator();
 	static MStatus initialize();
 
 	inline static const MString nodeTypeName = "customSkinCluster";
@@ -23,6 +22,12 @@ public:
 	static MObject doRecompute;
 	static MObject smoothAmount;
 	static MObject smoothIteration;
+
+public:
+	static void* creator()
+	{
+		return new CustomSkinCluster();
+	}
 
 private:
 

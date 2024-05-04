@@ -102,8 +102,10 @@ MPoint DeformerDDM::Deform(
 
 	MMatrix PsiM = MatrixUtil::ZeroMatrix();
 
-	for (const int j : m_jointIdxs[vertIdx])
+	for (size_t idx = 0; idx < MaxInfluence; idx++)
 	{
+		// joint index
+		const int j = m_jointIdxs[vertIdx][idx];
 		if (j < 0)
 		{
 			continue;
@@ -116,8 +118,7 @@ MPoint DeformerDDM::Deform(
 		MMatrix preBindMatrix = MFnMatrixData(bindHandle.inputValue().data()).matrix();
 		jointMat = preBindMatrix * jointMat;
 
-		// FIXME: ここは j ではなく、jointIdxs のインデックスにするべき
-		PsiM += m_psiMats[vertIdx][j] * jointMat;
+		PsiM += m_psiMats[vertIdx][idx] * jointMat;
 	}
 
 

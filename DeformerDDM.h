@@ -38,7 +38,7 @@ public:
 
 private:
 
-	static constexpr unsigned int MaxInfluence = 4;
+	static constexpr size_t MaxInfluence = 8;
 
 	std::vector<std::array<MMatrix, MaxInfluence>> m_psiMats;
 	std::vector<std::array<int32_t, MaxInfluence>> m_jointIdxs;
