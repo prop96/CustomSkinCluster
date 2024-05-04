@@ -7,27 +7,6 @@
 #include <maya/MPointArray.h>
 #include <maya/MStatus.h>
 
-DeformerDDM::DeformerDDM()
-{
-}
-
-DeformerDDM::~DeformerDDM()
-{
-}
-
-MMatrix ZeroMatrix()
-{
-	MMatrix tmp;
-	for (unsigned int matIdx0 = 0; matIdx0 < 4; matIdx0++)
-	{
-		for (unsigned int matIdx1 = 0; matIdx1 < 4; matIdx1++)
-		{
-			tmp[matIdx0][matIdx1] = 0.0f;
-		}
-	}
-
-	return tmp;
-}
 
 void DeformerDDM::SetSmoothingProperty(const SmoothingProperty& prop)
 {
@@ -56,9 +35,9 @@ void DeformerDDM::Precompute(MObject& mesh, MArrayDataHandle& weightListsHandle)
 		MArrayDataHandle weightsHandle = weightListsHandle.inputValue().child(MPxSkinCluster::weights);
 
 		unsigned int numWeights = weightsHandle.elementCount(); // # of nonzero weights
-		assert(numWeights <= 4);
+		assert(numWeights <= MaxInfluence);
 
-		for (unsigned int wIdx = 0; wIdx < 4; wIdx++)
+		for (unsigned int wIdx = 0; wIdx < MaxInfluence; wIdx++)
 		{
 			// 不要かもだけど、安全を期しておく
 			weightListsHandle.jumpToArrayElement(vIdx);
@@ -67,7 +46,7 @@ void DeformerDDM::Precompute(MObject& mesh, MArrayDataHandle& weightListsHandle)
 			weightsHandle.jumpToArrayElement(wIdx); // jump to physical index
 			unsigned int jointIdx = weightsHandle.elementIndex(); // logical index corresponds to the joint index
 
-			MMatrix tmp = ZeroMatrix();
+			MMatrix tmp = MatrixUtil::ZeroMatrix();
 
 			if (wIdx < numWeights)
 			{
@@ -121,7 +100,7 @@ MPoint DeformerDDM::Deform(
 {
 	MPoint skinned;
 
-	MMatrix PsiM = ZeroMatrix();
+	MMatrix PsiM = MatrixUtil::ZeroMatrix();
 
 	for (const int j : m_jointIdxs[vertIdx])
 	{

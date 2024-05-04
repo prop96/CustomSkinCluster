@@ -9,12 +9,12 @@
 class DeformerDDM
 {
 public:
-	DeformerDDM();
-	~DeformerDDM();
+	DeformerDDM() = default;
+	~DeformerDDM() = default;
 
 	struct SmoothingProperty
 	{
-		float Amount {0.0f};
+		double Amount {0.0f};
 		int Iteration {0};
 		bool IsImplicit {false};
 	};
@@ -38,8 +38,10 @@ public:
 
 private:
 
-	std::vector<std::array<MMatrix, 4>> m_psiMats;
-	std::vector<std::array<int32_t, 4>> m_jointIdxs;
+	static constexpr unsigned int MaxInfluence = 4;
+
+	std::vector<std::array<MMatrix, MaxInfluence>> m_psiMats;
+	std::vector<std::array<int32_t, MaxInfluence>> m_jointIdxs;
 
 	SmoothingProperty m_smoothingProp;
 };

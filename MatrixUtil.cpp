@@ -2,6 +2,7 @@
 #include <Eigen/Eigenvalues> 
 #include <Eigen/SVD>
 
+
 void MatrixUtil::SingularValueDecomposition(const MMatrix& mat, MMatrix& u, MMatrix& vt)
 {
     // decompose: mat = U * S * V^t
@@ -33,6 +34,18 @@ MMatrix MatrixUtil::BuildMatrixFromMPoint(const MPoint& a, const MPoint& b)
     }
 
     return mat;
+}
+
+MMatrix MatrixUtil::ZeroMatrix()
+{
+    // default MMatrix should be diagonal
+    MMatrix tmp;
+    for (unsigned int idx = 0; idx < 4; idx++)
+    {
+        tmp[idx][idx] = 0;
+    }
+
+    return tmp;
 }
 
 void MatrixUtil::FromMMatrixToEigenMat3(const MMatrix& in, Eigen::Matrix3d& out)

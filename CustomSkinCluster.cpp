@@ -1,20 +1,26 @@
 #include "CustomSkinCluster.h"
 #include <maya/MItMeshVertex.h>
-#include <maya/MItMeshPolygon.h>
-#include <maya/MMatrixArray.h>
 #include <maya/MFnMatrixData.h>
 #include <maya/MFnEnumAttribute.h>
-#include <maya/MPointArray.h>
+#include <maya/MFnNumericAttribute.h>
 #include <maya/MPoint.h>
 #include <vector>
 
-#include <maya/MFnNumericAttribute.h>
-#include <maya/MFnPointArrayData.h>
+namespace
+{
+	enum class SkinningType : short
+	{
+		LBS = 0,
+		DDM = 1,
+	};
+}
+
 
 const MTypeId CustomSkinCluster::id(0x00080031);
 MObject CustomSkinCluster::customSkinningMethod;
 MObject CustomSkinCluster::doRecompute;
-
+MObject CustomSkinCluster::smoothAmount;
+MObject CustomSkinCluster::smoothIteration;
 
 MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MMatrix& localToWorld, unsigned int multiIdx)
 {
@@ -42,19 +48,20 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 		return MS::kSuccess;
 	}
 
-	const short& skinningMethod = block.inputValue(customSkinningMethod).asShort();
+	const auto skinningMethod = static_cast<const SkinningType>(block.inputValue(customSkinningMethod).asShort());
 
 	// recompute if necessary
 	const bool& doRecomputeVal = block.inputValue(doRecompute).asBool();
-	if (doRecomputeVal && skinningMethod == 1)
+	if (doRecomputeVal && skinningMethod == SkinningType::DDM)
 	{
 		MFnDependencyNode thisNode(thisMObject());
 		MObject origGeom = thisNode.attribute("originalGeometry", &returnStat);
 
+		double smoothAmountVal = block.inputValue(smoothAmount).asDouble();
+		int smoothItrVal = block.inputValue(smoothIteration).asInt();
+		m_ddmDeformer.SetSmoothingProperty({smoothAmountVal, smoothItrVal, false});
+
 		MObject originalGeomV = block.inputArrayValue(origGeom, &returnStat).inputValue().asMesh();
-
-		m_ddmDeformer.SetSmoothingProperty({1.0, 3, false});
-
 		m_ddmDeformer.Precompute(originalGeomV, weightListsHandle);
 	}
 
@@ -74,10 +81,10 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 		MPoint skinned;
 		switch (skinningMethod)
 		{
-		case 0:
-			skinned = deformLBS(iter.index(), pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
+		case SkinningType::LBS:
+			skinned = m_lbsDeformer.Deform(iter.index(), pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
 			break;
-		case 1:
+		case SkinningType::DDM:
 			skinned = m_ddmDeformer.Deform(iter.index(), pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
 			break;
 		default:
@@ -107,51 +114,29 @@ MStatus CustomSkinCluster::initialize()
 
 	customSkinningMethod = eAttr.create("customSkinningMethod", "cskMethod", 0, &returnStat);
 	CHECK_MSTATUS(returnStat);
-	CHECK_MSTATUS(eAttr.addField("LBS", 0));
-	CHECK_MSTATUS(eAttr.addField("DDM", 1));
+	CHECK_MSTATUS(eAttr.addField("LBS", static_cast<short>(SkinningType::LBS)));
+	CHECK_MSTATUS(eAttr.addField("DDM", static_cast<short>(SkinningType::DDM)));
 	CHECK_MSTATUS(addAttribute(customSkinningMethod));
 
 	doRecompute = nAttr.create("doRecompute", "doRecompute", MFnNumericData::kBoolean, 1, &returnStat);
 	CHECK_MSTATUS(returnStat);
 	CHECK_MSTATUS(addAttribute(doRecompute));
 
+	smoothAmount = nAttr.create("smoothAmount", "smoothAmount", MFnNumericData::kDouble, 0.0, &returnStat);
+	CHECK_MSTATUS(returnStat);
+	CHECK_MSTATUS(nAttr.setMin(0.0));
+	CHECK_MSTATUS(nAttr.setMax(1.0));
+	CHECK_MSTATUS(addAttribute(smoothAmount));
+
+	smoothIteration = nAttr.create("smoothItr", "smoothItr", MFnNumericData::kInt, 0, &returnStat);
+	CHECK_MSTATUS(returnStat);
+	CHECK_MSTATUS(nAttr.setMin(0));
+	CHECK_MSTATUS(addAttribute(smoothIteration));
+
 	CHECK_MSTATUS(attributeAffects(customSkinningMethod, outputGeom));
 	CHECK_MSTATUS(attributeAffects(doRecompute, outputGeom));
+	CHECK_MSTATUS(attributeAffects(smoothAmount, outputGeom));
+	CHECK_MSTATUS(attributeAffects(smoothIteration, outputGeom));
 
 	return MStatus::kSuccess;
-}
-
-
-MPoint CustomSkinCluster::deformLBS(
-	int vertIdx,
-	const MPoint& pt,
-	const MMatrix& worldToLocal,
-	MArrayDataHandle& transformsHandle,
-	MArrayDataHandle& bindHandle,
-	MArrayDataHandle& weightsHandle,
-	MStatus* ptrStat)
-{
-	MPoint skinned;
-
-	// compute influences from each joint
-	unsigned int numWeights = weightsHandle.elementCount(); // # of nonzero weights
-	for (unsigned int wIdx = 0; wIdx < numWeights; wIdx++)
-	{
-		weightsHandle.jumpToArrayElement(wIdx); // jump to physical index
-		double w = weightsHandle.inputValue().asDouble();
-
-		// logical index corresponds to the joint index
-		unsigned int jointIdx = weightsHandle.elementIndex(ptrStat);
-
-		transformsHandle.jumpToElement(jointIdx); // jump to logical index
-		MMatrix jointMat = MFnMatrixData(transformsHandle.inputValue().data()).matrix();
-
-		bindHandle.jumpToElement(jointIdx); // jump to logical index
-		MMatrix preBindMatrix = MFnMatrixData(bindHandle.inputValue().data()).matrix();
-		jointMat = preBindMatrix * jointMat;
-
-		skinned += (pt * jointMat) * w;
-	}
-
-	return skinned * worldToLocal;
 }

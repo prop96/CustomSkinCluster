@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DeformerLBS.h"
 #include "DeformerDDM.h"
 #include <maya/MPxSkinCluster.h>
 #include <maya/MDataBlock.h>
@@ -20,17 +21,11 @@ public:
 
 	static MObject customSkinningMethod;
 	static MObject doRecompute;
+	static MObject smoothAmount;
+	static MObject smoothIteration;
 
 private:
 
 	DeformerDDM m_ddmDeformer;
-
-	MPoint deformLBS(
-		int vertIdx,
-		const MPoint& pt,
-		const MMatrix& worldToLocal,
-		MArrayDataHandle& transformsHandle,
-		MArrayDataHandle& bindHandle,
-		MArrayDataHandle& weightsHandle,
-		MStatus* ptrStat);
+	DeformerLBS m_lbsDeformer;
 };
