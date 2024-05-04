@@ -13,17 +13,8 @@
 
 const MTypeId CustomSkinCluster::id(0x00080031);
 MObject CustomSkinCluster::customSkinningMethod;
+MObject CustomSkinCluster::doRecompute;
 
-
-MStatus CustomSkinCluster::compute(const MPlug& plug, MDataBlock& data)
-{
-	MStatus returnStatus;
-
-	MString info = plug.info();
-	cout << info << endl;
-
-	return MPxSkinCluster::compute(plug, data);
-}
 
 MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MMatrix& localToWorld, unsigned int multiIdx)
 {
@@ -51,6 +42,23 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 		return MS::kSuccess;
 	}
 
+	const short& skinningMethod = block.inputValue(customSkinningMethod).asShort();
+
+	// recompute if necessary
+	const bool& doRecomputeVal = block.inputValue(doRecompute).asBool();
+	if (doRecomputeVal && skinningMethod == 1)
+	{
+		MFnDependencyNode thisNode(thisMObject());
+		MObject origGeom = thisNode.attribute("originalGeometry", &returnStat);
+
+		MObject originalGeomV = block.inputArrayValue(origGeom, &returnStat).inputValue().asMesh();
+
+		m_ddmDeformer.SetSmoothingProperty({1.0, 3, false});
+
+		m_ddmDeformer.Precompute(originalGeomV, weightListsHandle);
+	}
+
+
 	const MMatrix worldToLocal = localToWorld.inverse();
 
 	// Iterate through each point in the geometry
@@ -63,7 +71,18 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 		CHECK_MSTATUS(returnStat);
 
 		// compute the skinned position
-		MPoint skinned = deformLBS(pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
+		MPoint skinned;
+		switch (skinningMethod)
+		{
+		case 0:
+			skinned = deformLBS(iter.index(), pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
+			break;
+		case 1:
+			skinned = m_ddmDeformer.Deform(iter.index(), pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
+			break;
+		default:
+			break;
+		}
 		CHECK_MSTATUS(returnStat);
 		CHECK_MSTATUS(iter.setPosition(skinned));
 
@@ -84,47 +103,33 @@ MStatus CustomSkinCluster::initialize()
 	MStatus returnStat;
 
 	MFnEnumAttribute eAttr;
+	MFnNumericAttribute nAttr;
+
 	customSkinningMethod = eAttr.create("customSkinningMethod", "cskMethod", 0, &returnStat);
 	CHECK_MSTATUS(returnStat);
 	CHECK_MSTATUS(eAttr.addField("LBS", 0));
-	CHECK_MSTATUS(eAttr.addField("DQS", 1));
+	CHECK_MSTATUS(eAttr.addField("DDM", 1));
 	CHECK_MSTATUS(addAttribute(customSkinningMethod));
 
+	doRecompute = nAttr.create("doRecompute", "doRecompute", MFnNumericData::kBoolean, 1, &returnStat);
+	CHECK_MSTATUS(returnStat);
+	CHECK_MSTATUS(addAttribute(doRecompute));
+
 	CHECK_MSTATUS(attributeAffects(customSkinningMethod, outputGeom));
+	CHECK_MSTATUS(attributeAffects(doRecompute, outputGeom));
 
 	return MStatus::kSuccess;
 }
 
-double CustomSkinCluster::ComputeSimilarlityForCoR(const weight_map& w0, const weight_map& w1, double sigma)
-{
-	double ret = 0.0f;
-	for (auto pair0 : w0)
-	{
-		unsigned int j = pair0.first;
-
-		for (auto pair1 : w1)
-		{
-			unsigned int k = pair1.first;
-			if (w0.find(k) == w0.end() || w1.find(j) == w1.end() || j == k)
-			{
-				continue;
-			}
-
-			double tmp = (pair0.second * pair1.second - w0.at(k) * w1.at(j)) / sigma;
-			ret += pair0.second * pair1.second * w0.at(k) * w1.at(j) * std::exp(-tmp * tmp);
-		}
-	}
-
-	return ret;
-}
 
 MPoint CustomSkinCluster::deformLBS(
+	int vertIdx,
 	const MPoint& pt,
 	const MMatrix& worldToLocal,
 	MArrayDataHandle& transformsHandle,
 	MArrayDataHandle& bindHandle,
 	MArrayDataHandle& weightsHandle,
-	MStatus* ptrStat) 
+	MStatus* ptrStat)
 {
 	MPoint skinned;
 
