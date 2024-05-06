@@ -11,10 +11,14 @@
 
 void DeformerDDM::SetSmoothingProperty(const SmoothingProperty& prop)
 {
-	m_smoothingProp = prop;
+	if (m_smoothingProp != prop)
+	{
+		m_smoothingProp = prop;
+		m_isSmoothingMatDirty = true;
+	}
 }
 
-void DeformerDDM::Precompute(MObject& mesh, MArrayDataHandle& weightListsHandle)
+void DeformerDDM::Precompute(MObject& mesh, MArrayDataHandle& weightListsHandle, bool needRebindMesh)
 {
 	MFnMesh meshFn(mesh);
 
@@ -23,15 +27,27 @@ void DeformerDDM::Precompute(MObject& mesh, MArrayDataHandle& weightListsHandle)
 
 	const unsigned int numVerts = original.length();
 
-	// compute the smoothing matrix
-	Eigen::SparseMatrix<double> B(numVerts, numVerts);
-	MeshLaplacian::ComputeSmoothingMatrix(MItMeshEdge(mesh), numVerts,
-		m_smoothingProp.Amount, m_smoothingProp.Iteration, m_smoothingProp.IsImplicit, B);
+	// recompute laplacian if necessary
+	if (needRebindMesh)
+	{
+		MeshLaplacian::ComputeLaplacian(MItMeshEdge(mesh), numVerts, m_laplacian);
+		m_isSmoothingMatDirty = true;
+	}
+
+	// compute the smoothing matrix if necessary
+	if (m_isSmoothingMatDirty)
+	{
+		MeshLaplacian::ComputeSmoothingMatrix(m_laplacian, numVerts,
+			m_smoothingProp.Amount, m_smoothingProp.Iteration, m_smoothingProp.IsImplicit, m_smoothingMat);
+
+		m_isSmoothingMatDirty = false;
+	}
 
 	m_psiMats.resize(numVerts);
 	m_jointIdxs.resize(numVerts);
 
-	for (unsigned int vIdx = 0; vIdx < numVerts; vIdx++)
+
+	for (int vIdx = 0; vIdx < numVerts; vIdx++)
 	{
 		weightListsHandle.jumpToArrayElement(vIdx);
 		MArrayDataHandle weightsHandle = weightListsHandle.inputValue().child(MPxSkinCluster::weights);
@@ -78,7 +94,7 @@ void DeformerDDM::Precompute(MObject& mesh, MArrayDataHandle& weightListsHandle)
 					// compute ukuk
 					MPoint pos = original[k];
 					MMatrix ukuk = MatrixUtil::BuildMatrixFromMPoint(pos, pos);
-					tmp += B.coeff(k, vIdx) * w_kj * ukuk;
+					tmp += m_smoothingMat.coeff(k, vIdx) * w_kj * ukuk;
 				}
 			}
 			else

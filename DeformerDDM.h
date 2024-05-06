@@ -2,6 +2,8 @@
 #include <maya/MMatrix.h>
 #include <maya/MPoint.h>
 #include <maya/MArrayDataHandle.h>
+#include <Eigen/Sparse>
+#include <Eigen/Core>
 #include <vector>
 #include <array>
 
@@ -17,6 +19,16 @@ public:
 		double Amount {0.0f};
 		int Iteration {0};
 		bool IsImplicit {false};
+
+		friend bool operator==(const SmoothingProperty& a, const SmoothingProperty& b)
+		{
+			return a.Amount == b.Amount && a.Iteration == b.Iteration && a.IsImplicit == b.IsImplicit;
+		}
+
+		friend bool operator!=(const SmoothingProperty& a, const SmoothingProperty& b)
+		{
+			return !(a==b);
+		}
 	};
 
 	void SetSmoothingProperty(const SmoothingProperty& prop);
@@ -25,7 +37,7 @@ public:
 	/// <summary>
 	/// Compute Psi matrices array
 	/// </summary>
-	void Precompute(MObject& mesh, MArrayDataHandle& weightListsHandle);
+	void Precompute(MObject& mesh, MArrayDataHandle& weightListsHandle, bool needRebindMesh);
 
 	MPoint Deform(
 		int vertIdx,
@@ -44,4 +56,19 @@ private:
 	std::vector<std::array<int32_t, MaxInfluence>> m_jointIdxs;
 
 	SmoothingProperty m_smoothingProp;
+
+	/// <summary>
+	/// Laplacian matrix, which is determined by the mesh topology
+	/// </summary>
+	Eigen::SparseMatrix<double> m_laplacian;
+
+	/// <summary>
+	/// Smoothing matrix, which is determined by Laplacian matrix and the smoothing property
+	/// </summary>
+	Eigen::SparseMatrix<double> m_smoothingMat;
+
+	/// <summary>
+	/// dirty flag for recoputation of the smoothing matrix
+	/// </summary>
+	bool m_isSmoothingMatDirty = true;
 };

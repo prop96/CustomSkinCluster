@@ -20,6 +20,7 @@ namespace
 const MTypeId CustomSkinCluster::id(0x00080031);
 MObject CustomSkinCluster::customSkinningMethod;
 MObject CustomSkinCluster::doRecompute;
+MObject CustomSkinCluster::needRebindMesh;
 MObject CustomSkinCluster::smoothAmount;
 MObject CustomSkinCluster::smoothIteration;
 
@@ -55,22 +56,24 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 	const bool& doRecomputeVal = block.inputValue(doRecompute).asBool();
 	if (doRecomputeVal && skinningMethod == SkinningType::DDM)
 	{
-		MFnDependencyNode thisNode(thisMObject());
-		MObject origGeom = thisNode.attribute("originalGeometry", &returnStat);
-
 		double smoothAmountVal = block.inputValue(smoothAmount).asDouble();
 		int smoothItrVal = block.inputValue(smoothIteration).asInt();
-		m_ddmDeformer.SetSmoothingProperty({smoothAmountVal, smoothItrVal, false});
+		m_ddmDeformer.SetSmoothingProperty({ smoothAmountVal, smoothItrVal, false });
 
-		MObject originalGeomV = block.inputArrayValue(origGeom, &returnStat).inputValue().asMesh();
-		m_ddmDeformer.Precompute(originalGeomV, weightListsHandle);
+		MFnDependencyNode thisNode(thisMObject());
+		MObject origGeom = thisNode.attribute("originalGeometry", &returnStat);
+		MObject originalGeomVal = block.inputArrayValue(origGeom, &returnStat).inputValue().asMesh();
+		bool& needRebindMeshVal = block.inputValue(needRebindMesh).asBool();
+
+		m_ddmDeformer.Precompute(originalGeomVal, weightListsHandle, needRebindMeshVal);
+		needRebindMeshVal = false;
 	}
 
 
 	const MMatrix worldToLocal = localToWorld.inverse();
 
 	// Iterate through each point in the geometry
-	for (iter.reset(); !iter.isDone(); iter.next())
+	for (iter.reset(), weightListsHandle.jumpToArrayElement(0); !iter.isDone(); iter.next())
 	{
 		MPoint pt = iter.position();
 
@@ -118,6 +121,10 @@ MStatus CustomSkinCluster::initialize()
 	CHECK_MSTATUS(returnStat);
 	CHECK_MSTATUS(addAttribute(doRecompute));
 
+	needRebindMesh = nAttr.create("needRebindMesh", "rebindMesh", MFnNumericData::kBoolean, 1, &returnStat);
+	CHECK_MSTATUS(returnStat);
+	CHECK_MSTATUS(addAttribute(needRebindMesh));
+
 	smoothAmount = nAttr.create("smoothAmount", "smoothAmount", MFnNumericData::kDouble, 0.0, &returnStat);
 	CHECK_MSTATUS(returnStat);
 	CHECK_MSTATUS(nAttr.setMin(0.0));
@@ -131,6 +138,7 @@ MStatus CustomSkinCluster::initialize()
 
 	CHECK_MSTATUS(attributeAffects(customSkinningMethod, outputGeom));
 	CHECK_MSTATUS(attributeAffects(doRecompute, outputGeom));
+	CHECK_MSTATUS(attributeAffects(needRebindMesh, outputGeom));
 	CHECK_MSTATUS(attributeAffects(smoothAmount, outputGeom));
 	CHECK_MSTATUS(attributeAffects(smoothIteration, outputGeom));
 

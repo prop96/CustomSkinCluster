@@ -20,6 +20,7 @@ public:
 
 	static MObject customSkinningMethod;
 	static MObject doRecompute;
+	static MObject needRebindMesh;
 	static MObject smoothAmount;
 	static MObject smoothIteration;
 

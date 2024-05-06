@@ -37,7 +37,7 @@ public:
 		int p);
 
 	static void ComputeSmoothingMatrix(
-		MItMeshEdge& itEdge,
+		const Eigen::SparseMatrix<double>& laplacian,
 		const int numVertices,
 		double lambda,
 		int p,

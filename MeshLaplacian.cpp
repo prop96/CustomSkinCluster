@@ -256,16 +256,13 @@ void MeshLaplacian::ComputeSmoothingMatrix(
 }
 
 void MeshLaplacian::ComputeSmoothingMatrix(
-    MItMeshEdge& itEdge,
+    const Eigen::SparseMatrix<double>& laplacian,
     const int numVertices,
     double lambda,
     int p,
     bool isImplicit,
     Eigen::SparseMatrix<double>& B)
 {
-    Eigen::SparseMatrix<double> laplacian;
-    ComputeLaplacian(itEdge, numVertices, laplacian);
-
     Eigen::SparseMatrix<double> Identity(numVertices, numVertices);
     Identity.setIdentity();
 
