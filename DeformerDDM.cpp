@@ -6,6 +6,7 @@
 #include <maya/MFnMatrixData.h>
 #include <maya/MPointArray.h>
 #include <maya/MStatus.h>
+#include "omp.h"
 
 
 void DeformerDDM::SetSmoothingProperty(const SmoothingProperty& prop)
@@ -29,6 +30,7 @@ void DeformerDDM::Precompute(MObject& mesh, MArrayDataHandle& weightListsHandle)
 
 	m_psiMats.resize(numVerts);
 	m_jointIdxs.resize(numVerts);
+
 	for (unsigned int vIdx = 0; vIdx < numVerts; vIdx++)
 	{
 		weightListsHandle.jumpToArrayElement(vIdx);
@@ -39,24 +41,26 @@ void DeformerDDM::Precompute(MObject& mesh, MArrayDataHandle& weightListsHandle)
 
 		for (unsigned int wIdx = 0; wIdx < MaxInfluence; wIdx++)
 		{
-			// 不要かもだけど、安全を期しておく
-			weightListsHandle.jumpToArrayElement(vIdx);
-			weightsHandle = weightListsHandle.inputValue().child(MPxSkinCluster::weights);
-
-			weightsHandle.jumpToArrayElement(wIdx); // jump to physical index
-			unsigned int jointIdx = weightsHandle.elementIndex(); // logical index corresponds to the joint index
-
 			MMatrix tmp = MatrixUtil::ZeroMatrix();
 
 			if (wIdx < numWeights)
 			{
+				// 不要かもだけど、安全を期しておく
+				//weightListsHandle.jumpToArrayElement(vIdx);
+				//weightsHandle = weightListsHandle.inputValue().child(MPxSkinCluster::weights);
+
+				weightsHandle.jumpToArrayElement(wIdx); // jump to physical index
+				unsigned int jointIdx = weightsHandle.elementIndex(); // logical index corresponds to the joint index
+
 				m_jointIdxs[vIdx][wIdx] = jointIdx;
 
-				for (unsigned int k = 0; k < numVerts; k++)
+//#pragma omp parallel for
+				for (int k = 0; k < numVerts; k++)
 				{
 					// first, compute w_kj
 					weightListsHandle.jumpToArrayElement(k);
 					MArrayDataHandle tmpWeightsHandle = weightListsHandle.inputValue().child(MPxSkinCluster::weights);
+
 					double w_kj = 0.0f;
 					for (unsigned int wIdx2 = 0; wIdx2 < tmpWeightsHandle.elementCount(); wIdx2++)
 					{
@@ -72,10 +76,8 @@ void DeformerDDM::Precompute(MObject& mesh, MArrayDataHandle& weightListsHandle)
 					assert(w_kj >= 0.0 && w_kj <= 1.0);
 
 					// compute ukuk
-					// FIXME: 無駄な計算を省く
 					MPoint pos = original[k];
 					MMatrix ukuk = MatrixUtil::BuildMatrixFromMPoint(pos, pos);
-
 					tmp += B.coeff(k, vIdx) * w_kj * ukuk;
 				}
 			}
