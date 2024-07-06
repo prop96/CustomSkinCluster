@@ -2,6 +2,7 @@
 
 #include "DeformerLBS.h"
 #include "DeformerDDM.h"
+#include "DeformerDeltaMush.h"
 #include <maya/MPxSkinCluster.h>
 #include <maya/MDataBlock.h>
 #include <maya/MItGeometry.h>
@@ -34,4 +35,5 @@ private:
 
 	DeformerDDM m_ddmDeformer;
 	DeformerLBS m_lbsDeformer;
+	DeformerDeltaMush m_dmDeformer;
 };

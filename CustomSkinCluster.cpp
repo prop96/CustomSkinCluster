@@ -12,7 +12,8 @@ namespace
 	enum class SkinningType : short
 	{
 		LBS = 0,
-		DDM = 1,
+		DMLBS,
+		DDM,
 	};
 }
 
@@ -54,19 +55,26 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 
 	// recompute if necessary
 	const bool& doRecomputeVal = block.inputValue(doRecompute).asBool();
-	if (doRecomputeVal && skinningMethod == SkinningType::DDM)
+	if (doRecomputeVal)
 	{
-		double smoothAmountVal = block.inputValue(smoothAmount).asDouble();
-		int smoothItrVal = block.inputValue(smoothIteration).asInt();
-		m_ddmDeformer.SetSmoothingProperty({ smoothAmountVal, smoothItrVal, false });
+		if (skinningMethod == SkinningType::DDM)
+		{
+			double smoothAmountVal = block.inputValue(smoothAmount).asDouble();
+			int smoothItrVal = block.inputValue(smoothIteration).asInt();
+			m_ddmDeformer.SetSmoothingProperty({ smoothAmountVal, smoothItrVal, false });
 
-		MFnDependencyNode thisNode(thisMObject());
-		MObject origGeom = thisNode.attribute("originalGeometry", &returnStat);
-		MObject originalGeomVal = block.inputArrayValue(origGeom, &returnStat).inputValue().asMesh();
-		bool& needRebindMeshVal = block.inputValue(needRebindMesh).asBool();
+			MFnDependencyNode thisNode(thisMObject());
+			MObject origGeom = thisNode.attribute("originalGeometry", &returnStat);
+			MObject originalGeomVal = block.inputArrayValue(origGeom, &returnStat).inputValue().asMesh();
+			bool& needRebindMeshVal = block.inputValue(needRebindMesh).asBool();
 
-		m_ddmDeformer.Precompute(originalGeomVal, weightListsHandle, needRebindMeshVal);
-		needRebindMeshVal = false;
+			m_ddmDeformer.Precompute(originalGeomVal, weightListsHandle, needRebindMeshVal);
+			needRebindMeshVal = false;
+		}
+		else if (skinningMethod == SkinningType::DMLBS)
+		{
+
+		}
 	}
 
 
@@ -86,6 +94,7 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 		switch (skinningMethod)
 		{
 		case SkinningType::LBS:
+		case SkinningType::DMLBS:
 			skinned = m_lbsDeformer.Deform(iter.index(), pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
 			break;
 		case SkinningType::DDM:
@@ -101,6 +110,12 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 		CHECK_MSTATUS(weightListsHandle.next());
 	}
 
+	if (skinningMethod == SkinningType::DMLBS)
+	{
+		// Apply Delta Mush here
+		
+	}
+
 	return returnStat;
 }
 
@@ -114,6 +129,7 @@ MStatus CustomSkinCluster::initialize()
 	customSkinningMethod = eAttr.create("customSkinningMethod", "cskMethod", 0, &returnStat);
 	CHECK_MSTATUS(returnStat);
 	CHECK_MSTATUS(eAttr.addField("LBS", static_cast<short>(SkinningType::LBS)));
+	CHECK_MSTATUS(eAttr.addField("DM+LBS", static_cast<short>(SkinningType::DMLBS)));
 	CHECK_MSTATUS(eAttr.addField("DDM", static_cast<short>(SkinningType::DDM)));
 	CHECK_MSTATUS(addAttribute(customSkinningMethod));
 
