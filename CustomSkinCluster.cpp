@@ -14,6 +14,11 @@ namespace
 		LBS = 0,
 		DMLBS,
 		DDM,
+		DDM_v1,
+		DDM_v2,
+		DDM_v3,
+		DDM_v4,
+		DDM_v5,
 	};
 }
 
@@ -55,25 +60,34 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 
 	// recompute if necessary
 	const bool& doRecomputeVal = block.inputValue(doRecompute).asBool();
-	if (doRecomputeVal)
+	if (/*doRecomputeVal*/true)
 	{
-		if (skinningMethod == SkinningType::DDM)
+		MFnDependencyNode thisNode(thisMObject());
+		MObject origGeom = thisNode.attribute("originalGeometry", &returnStat);
+		MObject originalGeomVal = block.inputArrayValue(origGeom, &returnStat).inputValue().asMesh();
+
+		double smoothAmountVal = block.inputValue(smoothAmount).asDouble();
+		int smoothItrVal = block.inputValue(smoothIteration).asInt();
+
+		bool& needRebindMeshVal = block.inputValue(needRebindMesh).asBool();
+		if (doRecomputeVal && 
+			(skinningMethod == SkinningType::DDM
+				|| skinningMethod == SkinningType::DDM_v1
+				|| skinningMethod == SkinningType::DDM_v2
+				|| skinningMethod == SkinningType::DDM_v3
+				|| skinningMethod == SkinningType::DDM_v4
+				|| skinningMethod == SkinningType::DDM_v5))
 		{
-			double smoothAmountVal = block.inputValue(smoothAmount).asDouble();
-			int smoothItrVal = block.inputValue(smoothIteration).asInt();
 			m_ddmDeformer.SetSmoothingProperty({ smoothAmountVal, smoothItrVal, false });
-
-			MFnDependencyNode thisNode(thisMObject());
-			MObject origGeom = thisNode.attribute("originalGeometry", &returnStat);
-			MObject originalGeomVal = block.inputArrayValue(origGeom, &returnStat).inputValue().asMesh();
-			bool& needRebindMeshVal = block.inputValue(needRebindMesh).asBool();
-
 			m_ddmDeformer.Precompute(originalGeomVal, weightListsHandle, needRebindMeshVal);
+
 			needRebindMeshVal = false;
 		}
 		else if (skinningMethod == SkinningType::DMLBS)
 		{
+			m_dmDeformer.InitializeData(originalGeomVal, smoothItrVal, smoothAmountVal);
 
+			needRebindMeshVal = false;
 		}
 	}
 
@@ -100,6 +114,21 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 		case SkinningType::DDM:
 			skinned = m_ddmDeformer.Deform(iter.index(), pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
 			break;
+		case SkinningType::DDM_v1:
+			skinned = m_ddmDeformer.Deform_v1(iter.index(), pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
+			break;
+		case SkinningType::DDM_v2:
+			skinned = m_ddmDeformer.Deform_v2(iter.index(), pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
+			break;
+		case SkinningType::DDM_v3:
+			skinned = m_ddmDeformer.Deform_v3(iter.index(), pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
+			break;
+		case SkinningType::DDM_v4:
+			skinned = m_ddmDeformer.Deform_v4(iter.index(), pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
+			break;
+		case SkinningType::DDM_v5:
+			skinned = m_ddmDeformer.Deform_v5(iter.index(), pt, worldToLocal, transformsHandle, bindHandle, weightsHandle, &returnStat);
+			break;
 		default:
 			break;
 		}
@@ -112,8 +141,16 @@ MStatus CustomSkinCluster::deform(MDataBlock& block, MItGeometry& iter, const MM
 
 	if (skinningMethod == SkinningType::DMLBS)
 	{
-		// Apply Delta Mush here
-		
+		// LBS の結果を取得（取得は ObjectSpace で合っているか？）
+		MPointArray skinnedPoints;
+		iter.allPositions(skinnedPoints, MSpace::Space::kObject);
+
+		// Delta Mush を適用した結果を取得
+		MPointArray deformedPoints;
+		m_dmDeformer.ApplyDeltaMush(skinnedPoints, deformedPoints);
+
+		// Delta Mush の結果を設定（ObjectSpace で合っているか？）
+		iter.setAllPositions(deformedPoints);
 	}
 
 	return returnStat;
@@ -131,6 +168,11 @@ MStatus CustomSkinCluster::initialize()
 	CHECK_MSTATUS(eAttr.addField("LBS", static_cast<short>(SkinningType::LBS)));
 	CHECK_MSTATUS(eAttr.addField("DM+LBS", static_cast<short>(SkinningType::DMLBS)));
 	CHECK_MSTATUS(eAttr.addField("DDM", static_cast<short>(SkinningType::DDM)));
+	CHECK_MSTATUS(eAttr.addField("DDM_v1", static_cast<short>(SkinningType::DDM_v1)));
+	CHECK_MSTATUS(eAttr.addField("DDM_v2", static_cast<short>(SkinningType::DDM_v2)));
+	CHECK_MSTATUS(eAttr.addField("DDM_v3", static_cast<short>(SkinningType::DDM_v3)));
+	CHECK_MSTATUS(eAttr.addField("DDM_v4", static_cast<short>(SkinningType::DDM_v4)));
+	CHECK_MSTATUS(eAttr.addField("DDM_v5", static_cast<short>(SkinningType::DDM_v5)));
 	CHECK_MSTATUS(addAttribute(customSkinningMethod));
 
 	doRecompute = nAttr.create("doRecompute", "doRecompute", MFnNumericData::kBoolean, 1, &returnStat);

@@ -3,6 +3,7 @@
 #include <maya/MMatrix.h>
 #include <maya/MVector.h>
 #include <maya/MPoint.h>
+#include <maya/MQuaternion.h>
 
 
 /// <summary>
@@ -32,6 +33,34 @@ public:
 	/// </summary>
 	/// <returns></returns>
 	static MMatrix ZeroMatrix();
+
+	/// <summary>
+	/// Return 3x3 matrix by making unnecessary elements zero
+	/// </summary>
+	/// <param name="mat"></param>
+	/// <returns></returns>
+	static void To3x3Matrix(MMatrix& mat);
+
+	/// <summary>
+	/// compute the determinant of 3x3 matrix
+	/// </summary>
+	/// <param name="mat"></param>
+	/// <returns></returns>
+	static float Determinant3x3(const MMatrix& mat);
+
+	/// <summary>
+	/// Convert the rotation matrix to a quaternion
+	/// </summary>
+	/// <param name="mat"></param>
+	/// <returns></returns>
+	static MQuaternion MatrixToQuaternion(const MMatrix& mat);
+
+	/// <summary>
+	/// Convert the quaternion to a rotation matrix
+	/// </summary>
+	/// <param name="quat"></param>
+	/// <returns></returns>
+	static MMatrix QuaternionToMatrix(const MQuaternion& quat);
 
 private:
 	static void FromMMatrixToEigenMat3(const MMatrix& in, Eigen::Matrix3d& out);

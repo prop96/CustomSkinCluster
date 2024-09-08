@@ -3,6 +3,7 @@
 #include <maya/MFnMesh.h>
 #include <maya/MDataHandle.h>
 #include <maya/MItMeshVertex.h>
+#include <assert.h>
 
 DeformerDeltaMush::DeformerDeltaMush()
 	: targetPos()
@@ -21,7 +22,7 @@ MStatus DeformerDeltaMush::InitializeData(MObject& mesh)
 
 	// ’¸“_‚Ì—×Úî•ñ‚ğŠi”[
 	MItMeshVertex iter(mesh);
-	for (iter.reset(); iter.isDone(); iter.next())
+	for (iter.reset(); !iter.isDone(); iter.next())
 	{
 		PointData pd;
 		
@@ -68,12 +69,9 @@ void DeformerDeltaMush::ApplyDeltaMush(const MPointArray& skinned, MPointArray& 
 	double envelope = 1.0;
 	double applyDelta = 1.0;
 
-	if (!isInitialized)
-	{
-		//InitializeData()
-	}
+	assert(isInitialized);
 
-	uint32_t numVerts = skinned.length();
+	const uint32_t numVerts = skinned.length();
 	deformed.setLength(numVerts);
 
 	// compute mush

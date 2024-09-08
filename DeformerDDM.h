@@ -48,6 +48,51 @@ public:
 		MArrayDataHandle& weightsHandle,
 		MStatus* ptrStat) const;
 
+	MPoint Deform_v1(
+		int vertIdx,
+		const MPoint& pt,
+		const MMatrix& worldToLocal,
+		MArrayDataHandle& transformsHandle,
+		MArrayDataHandle& bindHandle,
+		MArrayDataHandle& weightsHandle,
+		MStatus* ptrStat) const;
+
+	MPoint Deform_v2(
+		int vertIdx,
+		const MPoint& pt,
+		const MMatrix& worldToLocal,
+		MArrayDataHandle& transformsHandle,
+		MArrayDataHandle& bindHandle,
+		MArrayDataHandle& weightsHandle,
+		MStatus* ptrStat) const;
+
+	MPoint Deform_v3(
+		int vertIdx,
+		const MPoint& pt,
+		const MMatrix& worldToLocal,
+		MArrayDataHandle& transformsHandle,
+		MArrayDataHandle& bindHandle,
+		MArrayDataHandle& weightsHandle,
+		MStatus* ptrStat) const;
+
+	MPoint Deform_v4(
+		int vertIdx,
+		const MPoint& pt,
+		const MMatrix& worldToLocal,
+		MArrayDataHandle& transformsHandle,
+		MArrayDataHandle& bindHandle,
+		MArrayDataHandle& weightsHandle,
+		MStatus* ptrStat) const;
+
+	MPoint Deform_v5(
+		int vertIdx,
+		const MPoint& pt,
+		const MMatrix& worldToLocal,
+		MArrayDataHandle& transformsHandle,
+		MArrayDataHandle& bindHandle,
+		MArrayDataHandle& weightsHandle,
+		MStatus* ptrStat) const;
+
 private:
 
 	static constexpr size_t MaxInfluence = 8;
