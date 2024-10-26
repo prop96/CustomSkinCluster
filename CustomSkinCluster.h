@@ -15,6 +15,7 @@ public:
 	static MStatus initialize();
 
 	inline static const MString nodeTypeName = "customSkinCluster";
+	static MString pluginPath;
 
 public:
 	static const MTypeId id;

@@ -1,6 +1,8 @@
 #include "ReplaceSkinClusterCmd.h"
 #include "CustomSkinCluster.h"
+#include "CustomSkinClusterGPU.h"
 #include <maya/MFnPlugin.h>
+#include <maya/MGPUDeformerRegistry.h>
 
 
 // The initializePlugin method is called by Maya when the custom-node
@@ -27,6 +29,17 @@ MStatus initializePlugin(MObject obj)
 		return returnStat;
 	}
 
+	returnStat = MGPUDeformerRegistry::registerGPUDeformerCreator(
+		"customSkinCluster",
+		"customSkinCluster",
+		CustomSkinClusterGPU::getGPUDeformerInfo());
+	CustomSkinCluster::pluginPath = plugin.loadPath();
+	if (!returnStat)
+	{
+		returnStat.perror("failed to create GPU override of the customSkinCluster");
+		return returnStat;
+	}
+
 	return returnStat;
 }
 
@@ -44,6 +57,13 @@ MStatus uninitializePlugin(MObject obj)
 	if (!returnStat)
 	{
 		returnStat.perror("deregisterCommand failed");
+		return returnStat;
+	}
+
+	returnStat = MGPUDeformerRegistry::deregisterGPUDeformerCreator("customSkinCluster", "customSkinCluster");
+	if (!returnStat)
+	{
+		returnStat.perror("deregister GPU override of the CustomSkinCluster failed");
 		return returnStat;
 	}
 

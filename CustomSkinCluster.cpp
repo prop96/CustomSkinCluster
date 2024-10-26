@@ -24,6 +24,7 @@ namespace
 
 
 const MTypeId CustomSkinCluster::id(0x00080031);
+MString CustomSkinCluster::pluginPath;
 MObject CustomSkinCluster::customSkinningMethod;
 MObject CustomSkinCluster::doRecompute;
 MObject CustomSkinCluster::needRebindMesh;
