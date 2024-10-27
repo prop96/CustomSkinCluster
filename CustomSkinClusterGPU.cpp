@@ -2,6 +2,7 @@
 #include "CustomSkinCluster.h"
 #include <maya/MOpenCLInfo.h>
 #include <maya/MGlobal.h>
+#include <maya/MFnMatrixData.h>
 
 
 MGPUDeformerRegistrationInfo* CustomSkinClusterGPU::getGPUDeformerInfo()
@@ -31,6 +32,10 @@ CustomSkinClusterGPU::~CustomSkinClusterGPU()
 
 void CustomSkinClusterGPU::terminate()
 {
+	weightsBuffer.reset();
+	influencesBuffer.reset();
+	transformMatricesBuffer.reset();
+
 	MOpenCLInfo::releaseOpenCLKernel(fKernel);
 	fKernel.reset();
 }
@@ -43,12 +48,6 @@ MPxGPUDeformer::DeformerStatus CustomSkinClusterGPU::evaluate(
 	const MGPUDeformerData& inputData,
 	MGPUDeformerData& outputData)
 {
-	// inputPlugs は基本1つ（inputPositions）しかない？ 
-	{
-		const int numInputPlugs = inputPlugs.length();
-		std::cout << numInputPlugs << std::endl;
-	}
-
 	// extract inputPositions Buffer from the inputPlug
 	const MPlug& inputPlug = inputPlugs[0];
 	const MGPUDeformerBuffer inputPositions = inputData.getBuffer(MPxGPUDeformer::sPositionsName(), inputPlug);
@@ -64,9 +63,18 @@ MPxGPUDeformer::DeformerStatus CustomSkinClusterGPU::evaluate(
 	// # of vertices in the mesh
 	const uint32_t numElements = inputPositions.elementCount();
 
+	// Load weights and transform matrices onto OpenCL buffer
+	ExtractTransformMatrices(block, evaluationNode, inputPlug);
+	ExtractWeights(block, evaluationNode, inputPlug, numElements);
+
 	// set up OpenCL kernel if not set up
 	if (!fKernel.get())
 	{
+		MString kernelFile = CustomSkinCluster::pluginPath + "/../skinLBS.cl";
+		MString kernelName = "skinLBS";
+
+		fKernel = MOpenCLInfo::getOpenCLKernel(kernelFile, kernelName);
+
 		SetupKernel(block, numElements);
 	}
 
@@ -76,6 +84,12 @@ MPxGPUDeformer::DeformerStatus CustomSkinClusterGPU::evaluate(
 	err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), (void*)outputPositions.buffer().getReadOnlyRef());
 	MOpenCLInfo::checkCLErrorStatus(err);
 	err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), (void*)inputPositions.buffer().getReadOnlyRef());
+	MOpenCLInfo::checkCLErrorStatus(err);
+	err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), (void*)weightsBuffer.getReadOnlyRef());
+	MOpenCLInfo::checkCLErrorStatus(err);
+	err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), (void*)influencesBuffer.getReadOnlyRef());
+	MOpenCLInfo::checkCLErrorStatus(err);
+	err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), (void*)transformMatricesBuffer.getReadOnlyRef());
 	MOpenCLInfo::checkCLErrorStatus(err);
 	err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_uint), (void*)&numElements);
 	MOpenCLInfo::checkCLErrorStatus(err);
@@ -117,10 +131,6 @@ MPxGPUDeformer::DeformerStatus CustomSkinClusterGPU::SetupKernel(MDataBlock& blo
 {
 	cl_int err = CL_SUCCESS;
 
-	MString kernelFile = CustomSkinCluster::pluginPath + "/../identity.cl";
-	MString kernelName = "identity";
-
-	fKernel = MOpenCLInfo::getOpenCLKernel(kernelFile, kernelName);
 	if (fKernel.isNull())
 	{
 		MGlobal::displayError("Error: Failed to get kernel from file");
@@ -149,4 +159,151 @@ MPxGPUDeformer::DeformerStatus CustomSkinClusterGPU::SetupKernel(MDataBlock& blo
 	fGlobalWorkSize = numElements + (remain != 0 ? fLocalWorkSize - remain : 0);
 
 	return kDeformerSuccess;
+}
+
+MStatus CustomSkinClusterGPU::ExtractWeights(MDataBlock& block, const MEvaluationNode& evaluationNode, const MPlug& plug, uint32_t numElements)
+{
+	MStatus status;
+	const bool needUpdate = weightsBuffer.isNull() || influencesBuffer.isNull() || evaluationNode.dirtyPlugExists(CustomSkinCluster::weightList, &status);
+	if (!needUpdate)
+	{
+		return status;
+	}
+
+	std::vector<float> weightsContainer;
+	std::vector<uint32_t> influencesContainer;
+
+	MArrayDataHandle weightListsHandle = block.inputArrayValue(CustomSkinCluster::weightList, &status);
+
+	weightListsHandle.jumpToArrayElement(0);
+	for (uint32_t vIdx = 0; vIdx < numElements; vIdx++)
+	{
+		MArrayDataHandle weightsHandle = weightListsHandle.inputValue(&status).child(CustomSkinCluster::weights);
+
+		const uint32_t numWeights = weightsHandle.elementCount(); // # of nonzero weights
+		for (uint32_t wIdx = 0; wIdx < numWeights; wIdx++) {
+			weightsHandle.jumpToArrayElement(wIdx); // jump to physical index
+
+			const double w = weightsHandle.inputValue().asDouble();
+			weightsContainer.push_back(static_cast<float>(w));
+
+			const uint32_t jointIdx = weightsHandle.elementIndex(&status); // logical index corresponds to joint index
+			influencesContainer.push_back(jointIdx);
+		}
+
+		// advance the weight list handle
+		CHECK_MSTATUS(weightListsHandle.next());
+	}
+
+	cl_int err = CL_SUCCESS;
+	if (!weightsBuffer.get())
+	{
+		weightsBuffer.attach(
+			clCreateBuffer(MOpenCLInfo::getOpenCLContext(),
+				CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY,
+				weightsContainer.size() * sizeof(float),
+				(void*)weightsContainer.data(),
+				&err)
+		);
+	}
+	else
+	{
+		err = clEnqueueWriteBuffer(
+			MOpenCLInfo::getMayaDefaultOpenCLCommandQueue(),
+			weightsBuffer.get(),
+			CL_TRUE,
+			0,
+			weightsContainer.size() * sizeof(float),
+			(void*)weightsContainer.data(),
+			0,
+			nullptr,
+			nullptr);
+	}
+
+	if (!influencesBuffer.get())
+	{
+		influencesBuffer.attach(
+			clCreateBuffer(MOpenCLInfo::getOpenCLContext(),
+				CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY,
+				influencesContainer.size() * sizeof(uint32_t),
+				(void*)influencesContainer.data(),
+				&err)
+		);
+	}
+	else
+	{
+		err = clEnqueueWriteBuffer(
+			MOpenCLInfo::getMayaDefaultOpenCLCommandQueue(),
+			influencesBuffer.get(),
+			CL_TRUE,
+			0,
+			influencesContainer.size() * sizeof(float),
+			(void*)influencesContainer.data(),
+			0,
+			nullptr,
+			nullptr);
+	}
+
+	return status;
+}
+
+MStatus CustomSkinClusterGPU::ExtractTransformMatrices(MDataBlock& block, const MEvaluationNode& evaluationNode, const MPlug& plug)
+{
+	MStatus status;
+	if (!transformMatricesBuffer.isNull() && !evaluationNode.dirtyPlugExists(CustomSkinCluster::matrix, &status))
+	{
+		return status;
+	}
+
+	std::vector<float> matricesContainer;
+
+	MArrayDataHandle bindHandle = block.inputArrayValue(CustomSkinCluster::bindPreMatrix, &status);
+	MArrayDataHandle transformsHandle = block.inputArrayValue(CustomSkinCluster::matrix, &status);
+	uint32_t numJoints = transformsHandle.elementCount();
+
+	for (uint32_t jIdx = 0; jIdx < numJoints; jIdx++)
+	{
+		MMatrix jointMat = MFnMatrixData(transformsHandle.inputValue().data()).matrix();
+		MMatrix preBindMatrix = MFnMatrixData(bindHandle.inputValue().data()).matrix();
+		jointMat = preBindMatrix * jointMat;
+
+		// send as 4x3 matrix to GPU
+		for (uint32_t c = 0; c < 3; c++)
+		{
+			for (uint32_t r = 0; r < 4; r++)
+			{
+				matricesContainer.push_back(static_cast<float>(jointMat(r,c)));
+			}
+		}
+
+		transformsHandle.next();
+		bindHandle.next();
+	}
+
+	cl_int err = CL_SUCCESS;
+	if (!transformMatricesBuffer.get())
+	{
+		transformMatricesBuffer.attach(
+			clCreateBuffer(MOpenCLInfo::getOpenCLContext(),
+				CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY,
+				matricesContainer.size() * sizeof(float),
+				(void*)matricesContainer.data(),
+				&err)
+		);
+	}
+	else
+	{
+		err = clEnqueueWriteBuffer(
+			MOpenCLInfo::getMayaDefaultOpenCLCommandQueue(),
+			transformMatricesBuffer.get(),
+			CL_TRUE,
+			0,
+			matricesContainer.size() * sizeof(float),
+			(void*)matricesContainer.data(),
+			0,
+			nullptr,
+			nullptr);
+	}
+
+	return status;
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include <maya/MPxGPUDeformer.h>
 #include <maya/MGPUDeformerRegistry.h>
+//#include <maya/MOpenCLBuffer.h>
 
 
 class CustomSkinClusterGPU : public MPxGPUDeformer {
@@ -27,7 +28,13 @@ private:
     size_t fLocalWorkSize;
     size_t fGlobalWorkSize;
 
+    MAutoCLMem weightsBuffer;
+    MAutoCLMem influencesBuffer;
+    MAutoCLMem transformMatricesBuffer;
+
     MPxGPUDeformer::DeformerStatus SetupKernel(MDataBlock& block, int32_t numElements);
+    MStatus ExtractWeights(MDataBlock& block, const MEvaluationNode& evaluationNode, const MPlug& plug, uint32_t numElements);
+    MStatus ExtractTransformMatrices(MDataBlock& block, const MEvaluationNode& evaluationNode, const MPlug& plug);
 };
 
 /// <summary>
