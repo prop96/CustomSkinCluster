@@ -1,7 +1,8 @@
 #pragma once
+#include "CustomSkinClusterGPU.h"
+#include "DeformerLBS.h"
 #include <maya/MPxGPUDeformer.h>
 #include <maya/MGPUDeformerRegistry.h>
-//#include <maya/MOpenCLBuffer.h>
 
 
 class CustomSkinClusterGPU : public MPxGPUDeformer {
@@ -10,10 +11,8 @@ public:
     static bool validateNodeInGraph(MDataBlock& block, const MEvaluationNode&, const MPlug& plug, MStringArray* messages);
     static bool validateNodeValues(MDataBlock& block, const MEvaluationNode&, const MPlug& plug, MStringArray* messages);
 
-    CustomSkinClusterGPU();
-    ~CustomSkinClusterGPU() override;
-
-    void terminate() override;
+    CustomSkinClusterGPU() = default;
+    ~CustomSkinClusterGPU() override = default;
 
     MPxGPUDeformer::DeformerStatus evaluate(
         MDataBlock& block,
@@ -24,17 +23,7 @@ public:
         MGPUDeformerData& outputData) override;
 
 private:
-    MAutoCLKernel fKernel;
-    size_t fLocalWorkSize;
-    size_t fGlobalWorkSize;
-
-    MAutoCLMem weightsBuffer;
-    MAutoCLMem influencesBuffer;
-    MAutoCLMem transformMatricesBuffer;
-
-    MPxGPUDeformer::DeformerStatus SetupKernel(MDataBlock& block, int32_t numElements);
-    MStatus ExtractWeights(MDataBlock& block, const MEvaluationNode& evaluationNode, const MPlug& plug, uint32_t numElements);
-    MStatus ExtractTransformMatrices(MDataBlock& block, const MEvaluationNode& evaluationNode, const MPlug& plug);
+    GPUDeformerLBS m_lbsDeformer;
 };
 
 /// <summary>

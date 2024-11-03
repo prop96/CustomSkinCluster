@@ -7,18 +7,31 @@
 #include <maya/MDataBlock.h>
 #include <maya/MItGeometry.h>
 
-
 class CustomSkinCluster : public MPxSkinCluster
 {
 public:
 	MStatus deform(MDataBlock& block, MItGeometry& iter, const MMatrix& mat, unsigned int multiIdx) override;
 	static MStatus initialize();
+	static void* creator()
+	{
+		return new CustomSkinCluster();
+	}
 
+	static const MTypeId id;
 	inline static const MString nodeTypeName = "customSkinCluster";
 	static MString pluginPath;
 
-public:
-	static const MTypeId id;
+	enum class SkinningType : int8_t
+	{
+		LBS = 0,
+		DMLBS,
+		DDM,
+		DDM_v1,
+		DDM_v2,
+		DDM_v3,
+		DDM_v4,
+		DDM_v5,
+	};
 
 	static MObject customSkinningMethod;
 	static MObject doRecompute;
@@ -26,14 +39,7 @@ public:
 	static MObject smoothAmount;
 	static MObject smoothIteration;
 
-public:
-	static void* creator()
-	{
-		return new CustomSkinCluster();
-	}
-
 private:
-
 	DeformerDDM m_ddmDeformer;
 	DeformerLBS m_lbsDeformer;
 	DeformerDeltaMush m_dmDeformer;

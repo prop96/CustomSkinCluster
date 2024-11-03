@@ -7,22 +7,6 @@
 #include <vector>
 
 
-namespace
-{
-	enum class SkinningType : short
-	{
-		LBS = 0,
-		DMLBS,
-		DDM,
-		DDM_v1,
-		DDM_v2,
-		DDM_v3,
-		DDM_v4,
-		DDM_v5,
-	};
-}
-
-
 const MTypeId CustomSkinCluster::id(0x00080031);
 MString CustomSkinCluster::pluginPath;
 MObject CustomSkinCluster::customSkinningMethod;
